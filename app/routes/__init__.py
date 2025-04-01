@@ -1,0 +1,1 @@
+# Blueprint registration for application routes

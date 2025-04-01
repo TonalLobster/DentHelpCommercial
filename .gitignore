@@ -172,3 +172,31 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Heroku & Flask specifikt
+.env
+.flaskenv
+.venv
+venv/
+ENV/
+instance/
+*.log
+
+# Databas
+*.sqlite
+*.db
+
+# Tailwind/Front-end
+node_modules/
+.cache/
+dist/
+*.min.css
+*.min.js
+
+# OS-specifikt
+.DS_Store
+Thumbs.db
+
+# Tillfälliga filer
+tmp/
+.tmp/

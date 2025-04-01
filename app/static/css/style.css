@@ -1,0 +1,42 @@
+/* Custom CSS styles */
+
+/* Fix for audio player width */
+audio {
+    width: 100%;
+}
+
+/* Animation for recording indicator */
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        opacity: 0.9;
+    }
+    70% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0.95);
+        opacity: 0.9;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Flash messages */
+.flash-messages {
+    z-index: 50;
+    max-width: 24rem;
+}
+
+/* General typography improvements */
+body {
+    text-rendering: optimizeLegibility;
+}
+
+/* Fix for Alpine.js initial flash */
+[x-cloak] {
+    display: none !important;
+}

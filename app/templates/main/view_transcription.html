@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}DentalScribe AI - Transkription{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-semibold text-gray-900">Transkription</h1>
+            <a href="{{ url_for('main.dashboard') }}" class="text-blue-600 hover:text-blue-800">
+                &larr; Tillbaka till dashboard
+            </a>
+        </div>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <div class="py-4">
+            <!-- Transcription details -->
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+                <div class="px-4 py-5 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        Transkriptionsinformation
+                    </h3>
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                        Detaljer och metadata om transkriptionen.
+                    </p>
+                </div>
+                <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">
+                                Skapad
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">
+                                Patient-ID
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                {{ transcription.patient_id or 'Ej angivet' }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Tabs for transcription and summary -->
+            <div x-data="{ tab: 'transcription' }">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex" aria-label="Tabs">
+                        <button @click="tab = 'transcription'" :class="{'border-blue-500 text-blue-600': tab === 'transcription', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': tab !== 'transcription'}" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                            Transkription
+                        </button>
+                        <button @click="tab = 'summary'" :class="{'border-blue-500 text-blue-600': tab === 'summary', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': tab !== 'summary'}" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                            AI-sammanfattning
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Transcription content -->
+                <div x-show="tab === 'transcription'" class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            Fullständig transkription
+                        </h3>
+                        <div class="prose max-w-none">
+                            <p class="whitespace-pre-line">{{ transcription.text }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary content -->
+                <div x-show="tab === 'summary'" class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            AI-genererad sammanfattning
+                        </h3>
+                        
+                        {% if transcription.summary %}
+                            <div class="space-y-6">
+                                {% for category, items in transcription.summary.items() %}
+                                    <div>
+                                        <h4 class="text-base font-medium text-gray-900">{{ category }}</h4>
+                                        {% if items %}
+                                            <ul class="mt-2 list-disc pl-5 space-y-1">
+                                                {% for item in items %}
+                                                    <li class="text-sm text-gray-700">{{ item }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="mt-2 text-sm text-gray-500">Ej angivet i konsultationen</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-6">
+                                <p class="text-sm text-gray-500">Ingen sammanfattning tillgänglig</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}DentalScribe AI - Ny transkription{% endblock %}
+
+{% block head %}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('audioRecorder', () => ({
+            isRecording: false,
+            recordingTime: 0,
+            timerInterval: null,
+            audioChunks: [],
+            audioBlob: null,
+            audioUrl: null,
+            mediaRecorder: null,
+            
+            formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            },
+            
+            async startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.audioChunks = [];
+                    
+                    this.mediaRecorder.addEventListener('dataavailable', (event) => {
+                        this.audioChunks.push(event.data);
+                    });
+                    
+                    this.mediaRecorder.addEventListener('stop', () => {
+                        this.audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                        this.audioUrl = URL.createObjectURL(this.audioBlob);
+                        document.getElementById('audio-player').src = this.audioUrl;
+                        
+                        // Add file to form for submission
+                        const audioFile = new File([this.audioBlob], 'recording.wav', { type: 'audio/wav' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(audioFile);
+                        document.getElementById('audio_file').files = dataTransfer.files;
+                    });
+                    
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    
+                    this.recordingTime = 0;
+                    this.timerInterval = setInterval(() => {
+                        this.recordingTime++;
+                    }, 1000);
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    alert('Kunde inte komma åt mikrofonen. Kontrollera att du har gett tillstånd.');
+                }
+            },
+            
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    clearInterval(this.timerInterval);
+                    
+                    // Stop all audio tracks
+                    this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+            }
+        }));
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold text-gray-900">Ny transkription</h1>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <div class="py-4">
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <form method="POST" enctype="multipart/form-data" x-data="audioRecorder">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <label for="patient_id" class="block text-sm font-medium text-gray-700">Patient-ID (valfritt)</label>
+                                <div class="mt-1">
+                                    <input type="text" name="patient_id" id="patient_id" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Patient-ID för enklare identifiering">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                                    <div class="w-full md:w-1/2">
+                                        <label class="block text-sm font-medium text-gray-700">Spela in ljud</label>
+                                        <div class="mt-1 flex flex-col space-y-4 items-center justify-center border-2 border-dashed border-gray-300 rounded-md p-6">
+                                            <div class="text-center" x-show="!isRecording && !audioUrl">
+                                                <button type="button" @click="startRecording" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
+                                                    </svg>
+                                                    Starta inspelning
+                                                </button>
+                                            </div>
+                                            
+                                            <div x-show="isRecording" class="flex flex-col items-center">
+                                                <div class="flex items-center justify-center h-16 w-16 rounded-full bg-red-100 animate-pulse">
+                                                    <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <span class="mt-2 text-sm font-medium text-gray-900" x-text="formatTime(recordingTime)"></span>
+                                                <button type="button" @click="stopRecording" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                                    Stoppa inspelning
+                                                </button>
+                                            </div>
+                                            
+                                            <div x-show="audioUrl" class="w-full">
+                                                <audio id="audio-player" controls class="w-full"></audio>
+                                                <div class="mt-2 flex justify-center">
+                                                    <button type="button" @click="startRecording" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                                        Spela in igen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="w-full md:w-1/2">
+                                        <label class="block text-sm font-medium text-gray-700">Eller ladda upp ljudfil</label>
+                                        <div class="mt-1">
+                                            <input id="audio_file" name="audio_file" type="file" class="sr-only" accept="audio/*">
+                                            <label for="audio_file" class="relative block w-full border-2 border-gray-300 border-dashed rounded-md p-12 text-center hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
+                                                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                <span class="mt-2 block text-sm font-medium text-gray-900">
+                                                    Dra och släpp fil här, eller klicka för att bläddra
+                                                </span>
+                                                <span class="mt-2 block text-sm text-gray-500">
+                                                    Stöder WAV, MP3, M4A och andra ljudformat
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="pt-5">
+                                <div class="flex justify-end">
+                                    <a href="{{ url_for('main.dashboard') }}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Avbryt
+                                    </a>
+                                    <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Transkribera
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
