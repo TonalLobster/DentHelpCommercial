@@ -1,85 +1,90 @@
+"""
+Transcription service for converting audio to text using OpenAI's Whisper API.
+"""
+import os
+import logging
+import tempfile
+from io import BytesIO
 import openai
 from flask import current_app
 
-def generate_summary(transcription_text):
+logger = logging.getLogger(__name__)
+
+def get_api_key():
+    """Get OpenAI API key from environment or application config."""
+    if api_key := os.environ.get("OPENAI_API_KEY"):
+        return api_key
+    
+    if hasattr(current_app, 'config') and current_app.config.get('OPENAI_API_KEY'):
+        return current_app.config['OPENAI_API_KEY']
+    
+    return None
+
+def transcribe_audio(audio_file):
     """
-    Generate a structured summary of the dental consultation
+    Transcribe an audio file using OpenAI's Whisper API.
     
     Args:
-        transcription_text: The transcribed text from the consultation
+        audio_file: A BytesIO object or file-like object with audio data
         
     Returns:
-        dict: A structured summary with extracted information
+        str: Transcribed text
     """
     try:
-        openai.api_key = current_app.config['OPENAI_API_KEY']
+        # Try to get API key
+        api_key = get_api_key()
+            
+        if not api_key:
+            raise ValueError("OpenAI API key missing. Check environment variables or app configuration.")
         
-        # Define the prompt for the GPT model
-        prompt = f"""
-        Based on the following dental consultation transcription, extract and organize the information into a structured summary.
-        Include these categories:
-        1. Patient Complaints
-        2. Clinical Findings
-        3. Diagnosis
-        4. Treatment Plan
-        5. Follow-up Recommendations
+        # Create client with API key
+        client = openai.OpenAI(api_key=api_key)
         
-        For each category, provide bullet points of the key information. If a category is not mentioned in the text, mark it as "Not mentioned".
-        
-        Transcription:
-        {transcription_text}
-        """
-        
-        # Call OpenAI API to generate the summary
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # or another appropriate model
-            messages=[
-                {"role": "system", "content": "You are a dental professional assistant that extracts structured information from consultation transcripts."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3
-        )
-        
-        # Process the response to extract the structured information
-        summary_text = response.choices[0].message.content
-        
-        # Parse the summary text and convert to structured data
-        # This is a simplified version - in a real app, you'd want more robust parsing
-        sections = {
-            "Patient Complaints": [],
-            "Clinical Findings": [],
-            "Diagnosis": [],
-            "Treatment Plan": [],
-            "Follow-up Recommendations": []
-        }
-        
-        current_section = None
-        
-        for line in summary_text.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
+        # Handle different types of input
+        temp_file = None
+        try:
+            if hasattr(audio_file, 'read'):
+                # Reset read head to beginning of file if it's a file-like object
+                audio_file.seek(0)
                 
-            # Check if this is a section header
-            for section in sections:
-                if section in line or f"{section}:" in line:
-                    current_section = section
-                    break
+                # If it's a file-like object that isn't BytesIO, save it temporarily
+                if not isinstance(audio_file, BytesIO):
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+                    temp_file.write(audio_file.read())
+                    temp_file.close()
+                    audio_file.seek(0)  # Reset read head again
                     
-            # If we're in a section and this is a bullet point, add it
-            if current_section and (line.startswith('-') or line.startswith('•')):
-                item = line[1:].strip()
-                sections[current_section].append(item)
-        
-        return sections
-        
+                    # Open the temporary file
+                    with open(temp_file.name, 'rb') as f:
+                        transcription = client.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=f,
+                            language="sv"  # Swedish
+                        )
+                else:
+                    # If it's a BytesIO, use it directly
+                    transcription = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        language="sv"  # Swedish
+                    )
+            else:
+                # If it's not a file-like object, assume it's a path
+                with open(audio_file, 'rb') as f:
+                    transcription = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=f,
+                        language="sv"  # Swedish
+                    )
+                    
+            return transcription.text
+            
+        finally:
+            # Remove temporary file if created
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+                
     except Exception as e:
-        current_app.logger.error(f"Summary generation error: {str(e)}")
-        # Return a basic structure in case of error
-        return {
-            "Patient Complaints": ["Error generating summary"],
-            "Clinical Findings": [],
-            "Diagnosis": [],
-            "Treatment Plan": [],
-            "Follow-up Recommendations": []
-        }
+        # Log the actual error for debugging
+        logger.error(f"Transcription error: {str(e)}")
+        raise RuntimeError(f"Error during transcription: {str(e)}")

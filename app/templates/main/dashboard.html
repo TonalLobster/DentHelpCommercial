@@ -1,95 +1,291 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Dashboard{% endblock %}
+{% block title %}Dashboard | DentalScribe AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+    
+    .empty-state .icon {
+        font-size: 3rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+    
+    .transcription-card {
+        border-left: 4px solid #0d6efd;
+        transition: all 0.2s ease;
+    }
+    
+    .transcription-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    
+    .timestamp {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .status-badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        border-radius: 0 0.25rem 0 0.25rem;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .search-container {
+        position: relative;
+    }
+    
+    .search-container .form-control {
+        padding-left: 2.5rem;
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .filter-dropdown {
+        min-width: 200px;
+    }
+    
+    .filter-dropdown .dropdown-item {
+        display: flex;
+        align-items: center;
+    }
+    
+    .filter-dropdown .dropdown-item i {
+        width: 20px;
+        margin-right: 8px;
+    }
+    
+    .pagination {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
-    </div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <div class="py-4">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-2 md:mb-0">Dina transkriptioner</h2>
-                <a href="{{ url_for('main.transcribe') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-                    </svg>
-                    Ny transkription
-                </a>
-            </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Mina Transkriptioner</h2>
+    <a href="{{ url_for('main.transcribe') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Ny Transkription
+    </a>
+</div>
 
-            {% if transcriptions %}
-            <div class="bg-white shadow overflow-hidden sm:rounded-md">
-                <ul class="divide-y divide-gray-200">
-                    {% for transcription in transcriptions %}
-                    <li>
-                        <a href="{{ url_for('main.view_transcription', id=transcription.id) }}" class="block hover:bg-gray-50">
-                            <div class="px-4 py-4 sm:px-6">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center">
-                                        <p class="text-sm font-medium text-blue-600 truncate">
-                                            {% if transcription.patient_id %}
-                                                Patient: {{ transcription.patient_id }}
-                                            {% else %}
-                                                Transkription #{{ transcription.id }}
-                                            {% endif %}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% else %}
-            <div class="text-center py-12 bg-white shadow overflow-hidden sm:rounded-md">
-                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">Inga transkriptioner ännu</h3>
-                <p class="mt-1 text-sm text-gray-500">
-                    Kom igång genom att skapa din första transkription.
-                </p>
-                <div class="mt-6">
-                    <a href="{{ url_for('main.transcribe') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-                        </svg>
-                        Ny transkription
-                    </a>
-                </div>
-            </div>
-            {% endif %}
+<!-- Search and Filter Bar -->
+<div class="row mb-4">
+    <div class="col-md-9">
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="form-control" id="search-transcriptions" placeholder="Sök transkriptioner...">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-filter me-1"></i>Filter
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end filter-dropdown" aria-labelledby="filterDropdown">
+                <li><h6 class="dropdown-header">Sortera efter</h6></li>
+                <li><a class="dropdown-item active" href="#" data-sort="date-desc"><i class="fas fa-calendar-alt"></i>Senaste först</a></li>
+                <li><a class="dropdown-item" href="#" data-sort="date-asc"><i class="fas fa-calendar-alt"></i>Äldsta först</a></li>
+                <li><a class="dropdown-item" href="#" data-sort="title-asc"><i class="fas fa-sort-alpha-down"></i>Titel (A-Ö)</a></li>
+                <li><a class="dropdown-item" href="#" data-sort="title-desc"><i class="fas fa-sort-alpha-up"></i>Titel (Ö-A)</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Visa</h6></li>
+                <li><a class="dropdown-item" href="#" data-filter="all"><i class="fas fa-list"></i>Alla transkriptioner</a></li>
+                <li><a class="dropdown-item" href="#" data-filter="recent"><i class="fas fa-clock"></i>Senaste 30 dagarna</a></li>
+            </ul>
         </div>
     </div>
 </div>
+
+<div class="transcription-list">
+    {% if transcriptions %}
+        <div class="row row-cols-1 row-cols-md-2 g-4" id="transcription-cards">
+            {% for transcription in transcriptions %}
+                <div class="col transcription-item">
+                    <div class="card h-100 shadow-sm transcription-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">{{ transcription.title }}</h5>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-dark" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{{ url_for('main.view_transcription', id=transcription.id) }}"><i class="fas fa-eye me-2"></i>Visa</a></li>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-edit me-2"></i>Redigera</a></li>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-export me-2"></i>Exportera</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#"><i class="fas fa-trash-alt me-2"></i>Ta bort</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card-body position-relative">
+                            <p class="card-text">
+                                {{ transcription.transcription_text[:150] + '...' if transcription.transcription_text|length > 150 else transcription.transcription_text }}
+                            </p>
+                            <div class="text-end">
+                                <a href="{{ url_for('main.view_transcription', id=transcription.id) }}" class="btn btn-sm btn-primary">Visa detaljer</a>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <small class="timestamp">
+                                <i class="far fa-calendar-alt me-1"></i>{{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Transcription pagination">
+                <ul class="pagination">
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" tabindex="-1" aria-disabled="true">Föregående</a>
+                    </li>
+                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                    <li class="page-item"><a class="page-link" href="#">2</a></li>
+                    <li class="page-item"><a class="page-link" href="#">3</a></li>
+                    <li class="page-item">
+                        <a class="page-link" href="#">Nästa</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <div class="icon">
+                <i class="far fa-file-alt"></i>
+            </div>
+            <h4>Inga transkriptioner ännu</h4>
+            <p class="text-muted">Du har inte skapat några transkriptioner. Klicka på knappen nedan för att komma igång.</p>
+            <a href="{{ url_for('main.transcribe') }}" class="btn btn-primary mt-3">
+                <i class="fas fa-plus me-1"></i>Skapa din första transkription
+            </a>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}
-                                    </div>
-                                    <div class="ml-2 flex-shrink-0 flex">
-                                        <p class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                            {% if transcription.summary %}
-                                                Sammanfattad
-                                            {% else %}
-                                                Endast transkription
-                                            {% endif %}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="mt-2 sm:flex sm:justify-between">
-                                    <div class="sm:flex">
-                                        <p class="flex items-center text-sm text-gray-500">
-                                            <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1z" clip-rule="evenodd" />
-                                            </svg>
-                                            {{ transcription.text|truncate(100) }}
-                                        </p>
-                                    </div>
-                                    <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                        <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
-                                        </svg>
-                                        <p>
-                                            {{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}
-                                        </p>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('search-transcriptions');
+        const transcriptionItems = document.querySelectorAll('.transcription-item');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            transcriptionItems.forEach(item => {
+                const title = item.querySelector('.card-title').textContent.toLowerCase();
+                const text = item.querySelector('.card-text').textContent.toLowerCase();
+                
+                if (title.includes(searchTerm) || text.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+        
+        // Sorting functionality
+        const sortLinks = document.querySelectorAll('[data-sort]');
+        const transcriptionCards = document.getElementById('transcription-cards');
+        
+        sortLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Update active state in dropdown
+                document.querySelector('.dropdown-item.active').classList.remove('active');
+                this.classList.add('active');
+                
+                const sortType = this.getAttribute('data-sort');
+                sortTranscriptions(sortType);
+            });
+        });
+        
+        function sortTranscriptions(sortType) {
+            const items = Array.from(transcriptionItems);
+            
+            items.sort((a, b) => {
+                const titleA = a.querySelector('.card-title').textContent;
+                const titleB = b.querySelector('.card-title').textContent;
+                const dateA = a.querySelector('.timestamp').textContent;
+                const dateB = b.querySelector('.timestamp').textContent;
+                
+                switch(sortType) {
+                    case 'date-desc':
+                        return dateB.localeCompare(dateA);
+                    case 'date-asc':
+                        return dateA.localeCompare(dateB);
+                    case 'title-asc':
+                        return titleA.localeCompare(titleB);
+                    case 'title-desc':
+                        return titleB.localeCompare(titleA);
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Re-append items in new order
+            items.forEach(item => {
+                transcriptionCards.appendChild(item);
+            });
+        }
+        
+        // Filter functionality
+        const filterLinks = document.querySelectorAll('[data-filter]');
+        
+        filterLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const filterType = this.getAttribute('data-filter');
+                filterTranscriptions(filterType);
+            });
+        });
+        
+        function filterTranscriptions(filterType) {
+            transcriptionItems.forEach(item => {
+                if (filterType === 'all') {
+                    item.style.display = '';
+                    return;
+                }
+                
+                const dateText = item.querySelector('.timestamp').textContent;
+                const date = new Date(dateText.split('Skapad: ')[1]);
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                
+                if (filterType === 'recent' && date >= thirtyDaysAgo) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

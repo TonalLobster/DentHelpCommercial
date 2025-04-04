@@ -1,42 +1,218 @@
-/* Custom CSS styles */
+/* Custom Styles for DentalScribe AI */
 
-/* Fix for audio player width */
+/* Variables */
+:root {
+    --primary-color: #0d6efd;
+    --primary-dark: #0b5ed7;
+    --primary-light: #cfe2ff;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+    --body-bg: #f5f5f5;
+}
+
+/* Base Styles */
+body {
+    background-color: var(--body-bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Container adjustments */
+.container {
+    max-width: 1200px;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-weight: 700;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Buttons */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Cards */
+.card {
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    background-color: #fff;
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.card-footer {
+    border-top: 1px solid rgba(0,0,0,0.05);
+    background-color: #fff;
+    border-radius: 0 0 10px 10px !important;
+}
+
+/* Forms */
+.form-control {
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    border: 1px solid #ced4da;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-floating > .form-control {
+    padding: 1rem;
+    height: calc(3.5rem + 2px);
+}
+
+.form-floating > label {
+    padding: 1rem;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    border-radius: 6px;
+}
+
+.badge-dental {
+    background-color: #e3f2fd;
+    color: var(--primary-color);
+    padding: 0.25em 0.5em;
+    border-radius: 4px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+/* Summary Cards */
+.summary-card {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+.summary-card .card-header {
+    background-color: var(--light-color);
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+}
+
+.summary-card .card-body {
+    padding: 1.25rem;
+}
+
+/* Audio Player */
 audio {
     width: 100%;
+    margin: 1rem 0;
+    border-radius: 6px;
 }
 
-/* Animation for recording indicator */
+/* Waveform Visualization */
+.audio-visualizer {
+    width: 100%;
+    height: 60px;
+    background-color: var(--light-color);
+    border-radius: 6px;
+}
+
+/* Record Button */
+.record-button {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    font-size: 1.5rem;
+    cursor: pointer;
+    background-color: var(--danger-color);
+    color: white;
+    transition: all 0.2s ease;
+}
+
+.record-button:hover {
+    transform: scale(1.05);
+}
+
+.record-button.recording {
+    animation: pulse 1.5s infinite;
+}
+
 @keyframes pulse {
-    0% {
-        transform: scale(0.95);
-        opacity: 0.9;
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Footer */
+.footer {
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    background-color: var(--light-color);
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2rem;
     }
-    70% {
-        transform: scale(1);
-        opacity: 1;
+    
+    .hero-subtitle {
+        font-size: 1.1rem;
     }
-    100% {
-        transform: scale(0.95);
-        opacity: 0.9;
+    
+    .card-deck .card {
+        margin-bottom: 1.5rem;
     }
-}
-
-.animate-pulse {
-    animation: pulse 2s infinite;
-}
-
-/* Flash messages */
-.flash-messages {
-    z-index: 50;
-    max-width: 24rem;
-}
-
-/* General typography improvements */
-body {
-    text-rendering: optimizeLegibility;
-}
-
-/* Fix for Alpine.js initial flash */
-[x-cloak] {
-    display: none !important;
 }

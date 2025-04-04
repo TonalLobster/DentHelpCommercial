@@ -1,109 +1,298 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Transkription{% endblock %}
+{% block title %}{{ transcription.title }} | DentalScribe AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .transcription-container {
+        white-space: pre-line;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .summary-card {
+        background-color: #fff;
+        border-left: 4px solid #0d6efd;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .summary-card .card-header {
+        display: flex;
+        align-items: center;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        padding: 12px 15px;
+    }
+    
+    .summary-card .icon {
+        font-size: 1.25rem;
+        margin-right: 10px;
+        color: #0d6efd;
+    }
+    
+    .timestamp {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    
+    .action-buttons {
+        position: sticky;
+        bottom: 0;
+        background-color: #fff;
+        padding: 15px 0;
+        border-top: 1px solid #e9ecef;
+        z-index: 100;
+    }
+    
+    .badge-dental {
+        background-color: #e3f2fd;
+        color: #0d6efd;
+        padding: 0.25em 0.5em;
+        border-radius: 4px;
+        margin-right: 4px;
+        font-size: 0.85em;
+    }
+    
+    #json-view pre {
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-semibold text-gray-900">Transkription</h1>
-            <a href="{{ url_for('main.dashboard') }}" class="text-blue-600 hover:text-blue-800">
-                &larr; Tillbaka till dashboard
-            </a>
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">{{ transcription.title }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">{{ transcription.title }}</h2>
+            <span class="timestamp">
+                <i class="far fa-calendar-alt me-1"></i>
+                {{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </span>
         </div>
     </div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <div class="py-4">
-            <!-- Transcription details -->
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-                <div class="px-4 py-5 sm:px-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">
-                        Transkriptionsinformation
-                    </h3>
-                    <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                        Detaljer och metadata om transkriptionen.
-                    </p>
-                </div>
-                <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
-                    <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-                        <div class="sm:col-span-1">
-                            <dt class="text-sm font-medium text-gray-500">
-                                Skapad
-                            </dt>
-                            <dd class="mt-1 text-sm text-gray-900">
-                                {{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}
-                            </dd>
-                        </div>
-                        <div class="sm:col-span-1">
-                            <dt class="text-sm font-medium text-gray-500">
-                                Patient-ID
-                            </dt>
-                            <dd class="mt-1 text-sm text-gray-900">
-                                {{ transcription.patient_id or 'Ej angivet' }}
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
+</div>
+    
+    <!-- Action buttons -->
+    <div class="action-buttons">
+        <div class="row">
+            <div class="col-md-6">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Tillbaka till Dashboard
+                </a>
             </div>
-
-            <!-- Tabs for transcription and summary -->
-            <div x-data="{ tab: 'transcription' }">
-                <div class="border-b border-gray-200">
-                    <nav class="-mb-px flex" aria-label="Tabs">
-                        <button @click="tab = 'transcription'" :class="{'border-blue-500 text-blue-600': tab === 'transcription', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': tab !== 'transcription'}" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm">
-                            Transkription
-                        </button>
-                        <button @click="tab = 'summary'" :class="{'border-blue-500 text-blue-600': tab === 'summary', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': tab !== 'summary'}" class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm">
-                            AI-sammanfattning
-                        </button>
-                    </nav>
-                </div>
-
-                <!-- Transcription content -->
-                <div x-show="tab === 'transcription'" class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
-                    <div class="px-4 py-5 sm:p-6">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            Fullständig transkription
-                        </h3>
-                        <div class="prose max-w-none">
-                            <p class="whitespace-pre-line">{{ transcription.text }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Summary content -->
-                <div x-show="tab === 'summary'" class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
-                    <div class="px-4 py-5 sm:p-6">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            AI-genererad sammanfattning
-                        </h3>
-                        
-                        {% if transcription.summary %}
-                            <div class="space-y-6">
-                                {% for category, items in transcription.summary.items() %}
-                                    <div>
-                                        <h4 class="text-base font-medium text-gray-900">{{ category }}</h4>
-                                        {% if items %}
-                                            <ul class="mt-2 list-disc pl-5 space-y-1">
-                                                {% for item in items %}
-                                                    <li class="text-sm text-gray-700">{{ item }}</li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="mt-2 text-sm text-gray-500">Ej angivet i konsultationen</p>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-center py-6">
-                                <p class="text-sm text-gray-500">Ingen sammanfattning tillgänglig</p>
-                            </div>
-                        {% endif %}
-                    </div>
+            <div class="col-md-6 text-end">
+                <div class="btn-group">
+                    <a href="#" class="btn btn-success" id="export-button">
+                        <i class="fas fa-file-export me-1"></i>Exportera
+                    </a>
+                    <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" id="export-pdf">PDF-format</a></li>
+                        <li><a class="dropdown-item" href="#" id="export-word">Word-format</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" id="export-json">JSON-format</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Copy JSON button functionality
+        const copyJsonBtn = document.getElementById('copy-json');
+        const jsonContent = document.getElementById('json-content');
+        
+        copyJsonBtn.addEventListener('click', function() {
+            const copyText = jsonContent.textContent;
+            navigator.clipboard.writeText(copyText).then(function() {
+                // Change button text temporarily
+                const originalText = copyJsonBtn.innerHTML;
+                copyJsonBtn.innerHTML = '<i class="fas fa-check me-1"></i>Kopierat!';
+                
+                setTimeout(function() {
+                    copyJsonBtn.innerHTML = originalText;
+                }, 2000);
+            }, function() {
+                alert('Kunde inte kopiera texten till urklipp. Försök igen.');
+            });
+        });
+        
+        // Export functionality
+        document.getElementById('export-button').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('export-pdf').click();
+        });
+        
+        document.getElementById('export-pdf').addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('PDF-export kommer i nästa version');
+        });
+        
+        document.getElementById('export-word').addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Word-export kommer i nästa version');
+        });
+        
+        document.getElementById('export-json').addEventListener('click', function(e) {
+            e.preventDefault();
+            // Create and download a JSON file
+            const data = JSON.parse(jsonContent.textContent);
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '{{ transcription.title }}.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    });
+</script>
+{% endblock %}
+
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs mb-4" id="transcriptionTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">
+                    <i class="fas fa-clipboard-list me-1"></i> Sammanfattning
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="transcript-tab" data-bs-toggle="tab" data-bs-target="#transcript" type="button" role="tab">
+                    <i class="fas fa-file-alt me-1"></i> Fullständig Transkription
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-view" type="button" role="tab">
+                    <i class="fas fa-code me-1"></i> JSON
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content" id="transcriptionTabContent">
+    <!-- Summary Tab -->
+    <div class="tab-pane fade show active" id="summary" role="tabpanel">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-notes-medical"></i></div>
+                        <div class="title">Anamnes</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.anamnes }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-search"></i></div>
+                        <div class="title">Status</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.status|safe }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-stethoscope"></i></div>
+                        <div class="title">Diagnos</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.diagnos }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-procedures"></i></div>
+                        <div class="title">Åtgärd</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.åtgärd }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-calendar-alt"></i></div>
+                        <div class="title">Behandlingsplan</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.behandlingsplan }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-comments"></i></div>
+                        <div class="title">Kommunikation</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.kommunikation }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Transcript Tab -->
+    <div class="tab-pane fade" id="transcript" role="tabpanel">
+        <div class="transcription-container shadow-sm">
+            {{ transcription.transcription_text }}
+        </div>
+    </div>
+    
+    <!-- JSON Tab -->
+    <div class="tab-pane fade" id="json-view" role="tabpanel">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-code me-2"></i>JSON Data</span>
+                    <button class="btn btn-sm btn-primary" id="copy-json">
+                        <i class="fas fa-copy me-1"></i>Kopiera
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre id="json-content">{{ summary|tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div

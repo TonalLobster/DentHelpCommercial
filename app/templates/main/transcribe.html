@@ -1,167 +1,354 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Ny transkription{% endblock %}
+{% block title %}Ny Transkription | DentalScribe AI{% endblock %}
 
-{% block head %}
-<script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('audioRecorder', () => ({
-            isRecording: false,
-            recordingTime: 0,
-            timerInterval: null,
-            audioChunks: [],
-            audioBlob: null,
-            audioUrl: null,
-            mediaRecorder: null,
-            
-            formatTime(seconds) {
-                const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = seconds % 60;
-                return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-            },
-            
-            async startRecording() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    this.mediaRecorder = new MediaRecorder(stream);
-                    this.audioChunks = [];
-                    
-                    this.mediaRecorder.addEventListener('dataavailable', (event) => {
-                        this.audioChunks.push(event.data);
-                    });
-                    
-                    this.mediaRecorder.addEventListener('stop', () => {
-                        this.audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                        this.audioUrl = URL.createObjectURL(this.audioBlob);
-                        document.getElementById('audio-player').src = this.audioUrl;
-                        
-                        // Add file to form for submission
-                        const audioFile = new File([this.audioBlob], 'recording.wav', { type: 'audio/wav' });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(audioFile);
-                        document.getElementById('audio_file').files = dataTransfer.files;
-                    });
-                    
-                    this.mediaRecorder.start();
-                    this.isRecording = true;
-                    
-                    this.recordingTime = 0;
-                    this.timerInterval = setInterval(() => {
-                        this.recordingTime++;
-                    }, 1000);
-                } catch (error) {
-                    console.error('Error accessing microphone:', error);
-                    alert('Kunde inte komma åt mikrofonen. Kontrollera att du har gett tillstånd.');
-                }
-            },
-            
-            stopRecording() {
-                if (this.mediaRecorder && this.isRecording) {
-                    this.mediaRecorder.stop();
-                    this.isRecording = false;
-                    clearInterval(this.timerInterval);
-                    
-                    // Stop all audio tracks
-                    this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                }
-            }
-        }));
-    });
-</script>
+{% block extra_css %}
+<style>
+    .upload-container {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-container:hover {
+        border-color: #0d6efd;
+        background-color: #f0f7ff;
+    }
+    
+    .record-container {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+    }
+    
+    .record-button {
+        font-size: 2rem;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .record-button:hover {
+        transform: scale(1.05);
+    }
+    
+    .record-button.recording {
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { background-color: #dc3545; }
+        50% { background-color: #b02a37; }
+        100% { background-color: #dc3545; }
+    }
+    
+    .audio-visualizer {
+        height: 60px;
+        margin: 15px 0;
+    }
+    
+    .timer {
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    
+    #audio-player {
+        width: 100%;
+        margin-top: 15px;
+    }
+    
+    .tab-content {
+        padding-top: 20px;
+    }
+    
+    .processing-spinner {
+        display: none;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 class="text-2xl font-semibold text-gray-900">Ny transkription</h1>
-    </div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <div class="py-4">
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                <div class="px-4 py-5 sm:p-6">
-                    <form method="POST" enctype="multipart/form-data" x-data="audioRecorder">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        
-                        <div class="space-y-6">
-                            <div>
-                                <label for="patient_id" class="block text-sm font-medium text-gray-700">Patient-ID (valfritt)</label>
-                                <div class="mt-1">
-                                    <input type="text" name="patient_id" id="patient_id" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="Patient-ID för enklare identifiering">
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex align-items-center">
+                <i class="fas fa-microphone-alt me-2"></i>
+                <h4 class="mb-0">Ny Transkription</h4>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="transcribeTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="record-tab" data-bs-toggle="tab" data-bs-target="#record" type="button" role="tab">
+                            <i class="fas fa-microphone me-1"></i> Spela in
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
+                            <i class="fas fa-upload me-1"></i> Ladda upp
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="transcribeTabContent">
+                    <!-- Recording Tab -->
+                    <div class="tab-pane fade show active" id="record" role="tabpanel">
+                        <div class="record-container">
+                            <form id="recording-form" method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
+                                <div class="mb-3">
+                                    <label for="recording-title" class="form-label">Titel</label>
+                                    <input type="text" class="form-control" id="recording-title" name="title" placeholder="Ange en titel för transkriptionen">
                                 </div>
-                            </div>
-                            
-                            <div>
-                                <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-                                    <div class="w-full md:w-1/2">
-                                        <label class="block text-sm font-medium text-gray-700">Spela in ljud</label>
-                                        <div class="mt-1 flex flex-col space-y-4 items-center justify-center border-2 border-dashed border-gray-300 rounded-md p-6">
-                                            <div class="text-center" x-show="!isRecording && !audioUrl">
-                                                <button type="button" @click="startRecording" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                                                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
-                                                    </svg>
-                                                    Starta inspelning
-                                                </button>
-                                            </div>
-                                            
-                                            <div x-show="isRecording" class="flex flex-col items-center">
-                                                <div class="flex items-center justify-center h-16 w-16 rounded-full bg-red-100 animate-pulse">
-                                                    <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd" />
-                                                    </svg>
-                                                </div>
-                                                <span class="mt-2 text-sm font-medium text-gray-900" x-text="formatTime(recordingTime)"></span>
-                                                <button type="button" @click="stopRecording" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                                                    Stoppa inspelning
-                                                </button>
-                                            </div>
-                                            
-                                            <div x-show="audioUrl" class="w-full">
-                                                <audio id="audio-player" controls class="w-full"></audio>
-                                                <div class="mt-2 flex justify-center">
-                                                    <button type="button" @click="startRecording" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                                                        Spela in igen
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                
+                                <div class="mb-4">
+                                    <div id="record-button" class="record-button btn btn-danger">
+                                        <i class="fas fa-microphone"></i>
                                     </div>
-                                    
-                                    <div class="w-full md:w-1/2">
-                                        <label class="block text-sm font-medium text-gray-700">Eller ladda upp ljudfil</label>
-                                        <div class="mt-1">
-                                            <input id="audio_file" name="audio_file" type="file" class="sr-only" accept="audio/*">
-                                            <label for="audio_file" class="relative block w-full border-2 border-gray-300 border-dashed rounded-md p-12 text-center hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
-                                                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                </svg>
-                                                <span class="mt-2 block text-sm font-medium text-gray-900">
-                                                    Dra och släpp fil här, eller klicka för att bläddra
-                                                </span>
-                                                <span class="mt-2 block text-sm text-gray-500">
-                                                    Stöder WAV, MP3, M4A och andra ljudformat
-                                                </span>
-                                            </label>
-                                        </div>
-                                    </div>
+                                    <div class="timer mt-2" id="timer">00:00</div>
+                                    <div class="mt-2 text-muted">Klicka för att starta inspelningen</div>
                                 </div>
-                            </div>
-                            
-                            <div class="pt-5">
-                                <div class="flex justify-end">
-                                    <a href="{{ url_for('main.dashboard') }}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                        Avbryt
-                                    </a>
-                                    <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                        Transkribera
+                                
+                                <canvas id="audio-visualizer" class="audio-visualizer"></canvas>
+                                
+                                <div id="audio-player-container" style="display: none;">
+                                    <audio id="audio-player" controls></audio>
+                                    <input type="hidden" name="audio-blob" id="audio-blob">
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <button type="submit" id="transcribe-recording" class="btn btn-primary" style="display: none;">
+                                        <span class="processing-spinner spinner-border spinner-border-sm" role="status"></span>
+                                        Transkribera inspelning
                                     </button>
                                 </div>
-                            </div>
+                            </form>
                         </div>
-                    </form>
+                    </div>
+                    
+                    <!-- Upload Tab -->
+                    <div class="tab-pane fade" id="upload" role="tabpanel">
+                        <form method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Titel</label>
+                                <input type="text" class="form-control" id="title" name="title" placeholder="Ange en titel för transkriptionen">
+                            </div>
+                            
+                            <div class="upload-container mb-4">
+                                <div class="mb-3">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    <h5>Dra och släpp ljudfil här</h5>
+                                    <p class="text-muted">eller</p>
+                                    <input type="file" class="form-control" id="audio-upload" name="audio" accept="audio/wav,audio/mp3,audio/x-m4a,audio/ogg">
+                                    <div class="form-text">Tillåtna format: WAV, MP3, M4A, OGG (max 100MB)</div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" id="upload-submit">
+                                <span class="processing-spinner spinner-border spinner-border-sm" role="status"></span>
+                                Transkribera fil
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Audio recording functionality
+        const recordButton = document.getElementById('record-button');
+        const audioPlayer = document.getElementById('audio-player');
+        const audioPlayerContainer = document.getElementById('audio-player-container');
+        const transcribeButton = document.getElementById('transcribe-recording');
+        const timerDisplay = document.getElementById('timer');
+        const visualizer = document.getElementById('audio-visualizer');
+        const visualizerCtx = visualizer.getContext('2d');
+        const recordingForm = document.getElementById('recording-form');
+        const audioBlobInput = document.getElementById('audio-blob');
+        
+        let mediaRecorder;
+        let audioChunks = [];
+        let startTime;
+        let timerInterval;
+        let isRecording = false;
+        let audioStream;
+        let audioContext;
+        let analyser;
+        let source;
+        
+        // Handle recording button click
+        recordButton.addEventListener('click', function() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+        
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioStream = stream;
+                    
+                    // Set up audio context and analyser for visualization
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+                    analyser.fftSize = 256;
+                    
+                    // Start visualization
+                    visualize();
+                    
+                    // Create media recorder instance
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    // Start recording
+                    mediaRecorder.start();
+                    audioChunks = [];
+                    
+                    // Update UI
+                    recordButton.innerHTML = '<i class="fas fa-stop"></i>';
+                    recordButton.classList.add('recording');
+                    isRecording = true;
+                    
+                    // Start timer
+                    startTime = Date.now();
+                    timerInterval = setInterval(updateTimer, 1000);
+                    
+                    // Handle data available event
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+                    
+                    // Handle recording stop event
+                    mediaRecorder.addEventListener("stop", () => {
+                        // Create blob and URL
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        // Set up audio player
+                        audioPlayer.src = audioUrl;
+                        audioPlayerContainer.style.display = 'block';
+                        
+                        // Create a FormData object to send the recording
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = function() {
+                            // Store the base64 encoded audio in the hidden input
+                            audioBlobInput.value = reader.result;
+                        }
+                        
+                        // Show transcribe button
+                        transcribeButton.style.display = 'inline-block';
+                    });
+                })
+                .catch(error => {
+                    console.error("Error accessing microphone:", error);
+                    alert("Kunde inte komma åt mikrofonen. Kontrollera att du har gett behörighet.");
+                });
+        }
+        
+        function stopRecording() {
+            // Stop media recorder
+            mediaRecorder.stop();
+            
+            // Stop timer
+            clearInterval(timerInterval);
+            
+            // Stop all tracks in the stream
+            audioStream.getTracks().forEach(track => track.stop());
+            
+            // Update UI
+            recordButton.innerHTML = '<i class="fas fa-microphone"></i>';
+            recordButton.classList.remove('recording');
+            isRecording = false;
+        }
+        
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const seconds = (elapsed % 60).toString().padStart(2, '0');
+            timerDisplay.textContent = `${minutes}:${seconds}`;
+        }
+        
+        function visualize() {
+            visualizer.width = visualizer.offsetWidth;
+            visualizer.height = visualizer.offsetHeight;
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            visualizerCtx.clearRect(0, 0, visualizer.width, visualizer.height);
+            
+            function draw() {
+                if (!isRecording) return;
+                
+                requestAnimationFrame(draw);
+                
+                analyser.getByteFrequencyData(dataArray);
+                
+                visualizerCtx.fillStyle = '#f8f9fa';
+                visualizerCtx.fillRect(0, 0, visualizer.width, visualizer.height);
+                
+                const barWidth = (visualizer.width / bufferLength) * 2.5;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i] / 255 * visualizer.height;
+                    
+                    visualizerCtx.fillStyle = `rgb(${barHeight + 100}, 50, 50)`;
+                    visualizerCtx.fillRect(x, visualizer.height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                }
+            }
+            
+            draw();
+        }
+        
+        // Form submission handlers
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const spinner = this.querySelector('.processing-spinner');
+                const submitButton = this.querySelector('button[type="submit"]');
+                
+                spinner.style.display = 'inline-block';
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Bearbetar...';
+            });
+        });
+        
+        // File upload preview
+        const fileInput = document.getElementById('audio-upload');
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const uploadContainer = document.querySelector('.upload-container');
+                uploadContainer.innerHTML = `
+                    <div class="mb-3">
+                        <i class="fas fa-file-audio fa-3x text-primary mb-3"></i>
+                        <h5>${file.name}</h5>
+                        <p class="text-muted">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                        <audio controls src="${URL.createObjectURL(file)}" style="width: 100%; margin-top: 10px;"></audio>
+                    </div>
+                `;
+            }
+        });
+    });
+</script>
 {% endblock %}

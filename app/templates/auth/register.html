@@ -1,73 +1,273 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Registrera konto{% endblock %}
+{% block title %}Registrera konto | DentalScribe AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-container {
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+    
+    .auth-card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .auth-logo {
+        font-size: 2rem;
+        color: #0d6efd;
+        margin-bottom: 1rem;
+    }
+    
+    .auth-title {
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-floating {
+        margin-bottom: 1rem;
+    }
+    
+    .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 1.5rem 0;
+    }
+    
+    .divider::before,
+    .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .divider span {
+        padding: 0 1rem;
+        color: #6c757d;
+    }
+    
+    .requirements {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .requirements ul {
+        padding-left: 1.25rem;
+        margin-bottom: 0;
+    }
+    
+    .password-strength {
+        height: 5px;
+        border-radius: 5px;
+        margin-top: 0.5rem;
+        background-color: #dee2e6;
+        overflow: hidden;
+    }
+    
+    .password-strength-bar {
+        height: 100%;
+        width: 0;
+        border-radius: 5px;
+        transition: width 0.3s ease, background-color 0.3s ease;
+    }
+    
+    .password-strength-text {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="min-h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Registrera ett nytt konto
-        </h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
-            Eller
-            <a href="{{ url_for('auth.login') }}" class="font-medium text-blue-600 hover:text-blue-500">
-                logga in på ett befintligt konto
-            </a>
-        </p>
-    </div>
-
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            <form class="space-y-6" action="{{ url_for('auth.register') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+<div class="auth-container">
+    <div class="card auth-card">
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <div class="auth-logo">
+                    <i class="fas fa-tooth"></i>
+                </div>
+                <h2 class="auth-title">Skapa ett DentalScribe-konto</h2>
+            </div>
+            
+            <form method="post" action="{{ url_for('auth.register') }}">
+                <div class="form-floating">
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Användarnamn" required>
+                    <label for="username">Användarnamn</label>
+                </div>
                 
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700">
-                        Användarnamn
-                    </label>
-                    <div class="mt-1">
-                        <input id="username" name="username" type="text" autocomplete="username" required
-                               class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                    </div>
+                <div class="form-floating">
+                    <input type="email" class="form-control" id="email" name="email" placeholder="E-post" required>
+                    <label for="email">E-post</label>
                 </div>
-
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">
-                        E-postadress
-                    </label>
-                    <div class="mt-1">
-                        <input id="email" name="email" type="email" autocomplete="email" required
-                               class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                    </div>
+                
+                <div class="form-floating">
+                    <input type="text" class="form-control" id="license_number" name="license_number" placeholder="Tandläkar-ID" required>
+                    <label for="license_number">Tandläkar-ID / Legitimationsnummer</label>
+                    <div class="form-text">Ange ditt tandläkar-ID eller legitimationsnummer.</div>
                 </div>
-
-                <div>
-                    <label for="license_number" class="block text-sm font-medium text-gray-700">
-                        Tandläkarlegitimationsnummer
-                    </label>
-                    <div class="mt-1">
-                        <input id="license_number" name="license_number" type="text" required
-                               class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                
+                <div class="form-floating">
+                    <input type="password" class="form-control" id="password" name="password" placeholder="Lösenord" required>
+                    <label for="password">Lösenord</label>
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="password-strength-bar"></div>
                     </div>
+                    <div class="password-strength-text" id="password-strength-text"></div>
                 </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">
-                        Lösenord
+                
+                <div class="form-floating">
+                    <input type="password" class="form-control" id="password_confirm" name="password_confirm" placeholder="Bekräfta lösenord" required>
+                    <label for="password_confirm">Bekräfta lösenord</label>
+                </div>
+                
+                <div class="requirements mb-3">
+                    <p class="mb-1">Lösenordet måste innehålla:</p>
+                    <ul>
+                        <li id="length">Minst 8 tecken</li>
+                        <li id="capital">Minst en stor bokstav</li>
+                        <li id="number">Minst en siffra</li>
+                        <li id="special">Minst ett specialtecken</li>
+                    </ul>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" value="agree" id="agree_terms" name="agree_terms" required>
+                    <label class="form-check-label" for="agree_terms">
+                        Jag godkänner <a href="#" target="_blank">användarvillkoren</a> och <a href="#" target="_blank">integritetspolicyn</a>
                     </label>
-                    <div class="mt-1">
-                        <input id="password" name="password" type="password" autocomplete="new-password" required
-                               class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                    </div>
                 </div>
-
-                <div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Registrera
-                    </button>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg" id="register-button" disabled>Registrera</button>
                 </div>
             </form>
+            
+            <div class="divider">
+                <span>Eller</span>
+            </div>
+            
+            <div class="text-center">
+                <p>Har du redan ett konto?</p>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary">Logga in</a>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const passwordInput = document.getElementById('password');
+        const passwordConfirmInput = document.getElementById('password_confirm');
+        const agreeTerms = document.getElementById('agree_terms');
+        const registerButton = document.getElementById('register-button');
+        const strengthBar = document.getElementById('password-strength-bar');
+        const strengthText = document.getElementById('password-strength-text');
+        
+        // Password requirement elements
+        const lengthReq = document.getElementById('length');
+        const capitalReq = document.getElementById('capital');
+        const numberReq = document.getElementById('number');
+        const specialReq = document.getElementById('special');
+        
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            let feedback = '';
+            
+            // Check length
+            if (password.length >= 8) {
+                strength += 25;
+                lengthReq.classList.add('text-success');
+            } else {
+                lengthReq.classList.remove('text-success');
+            }
+            
+            // Check for uppercase letters
+            if (/[A-Z]/.test(password)) {
+                strength += 25;
+                capitalReq.classList.add('text-success');
+            } else {
+                capitalReq.classList.remove('text-success');
+            }
+            
+            // Check for numbers
+            if (/[0-9]/.test(password)) {
+                strength += 25;
+                numberReq.classList.add('text-success');
+            } else {
+                numberReq.classList.remove('text-success');
+            }
+            
+            // Check for special characters
+            if (/[^A-Za-z0-9]/.test(password)) {
+                strength += 25;
+                specialReq.classList.add('text-success');
+            } else {
+                specialReq.classList.remove('text-success');
+            }
+            
+            // Update strength bar
+            strengthBar.style.width = strength + '%';
+            
+            // Set color based on strength
+            if (strength < 25) {
+                strengthBar.style.backgroundColor = '#dc3545'; // red
+                feedback = 'Mycket svagt';
+            } else if (strength < 50) {
+                strengthBar.style.backgroundColor = '#ffc107'; // yellow
+                feedback = 'Svagt';
+            } else if (strength < 75) {
+                strengthBar.style.backgroundColor = '#fd7e14'; // orange
+                feedback = 'Medel';
+            } else if (strength < 100) {
+                strengthBar.style.backgroundColor = '#20c997'; // teal
+                feedback = 'Starkt';
+            } else {
+                strengthBar.style.backgroundColor = '#198754'; // green
+                feedback = 'Mycket starkt';
+            }
+            
+            strengthText.textContent = feedback;
+            
+            return strength === 100;
+        }
+        
+        // Check if passwords match
+        function passwordsMatch() {
+            return passwordInput.value === passwordConfirmInput.value && passwordInput.value !== '';
+        }
+        
+        // Check if form is valid
+        function checkFormValidity() {
+            const isPasswordStrong = checkPasswordStrength(passwordInput.value);
+            const doPasswordsMatch = passwordsMatch();
+            const hasAgreed = agreeTerms.checked;
+            
+            // Enable button only if all conditions are met
+            registerButton.disabled = !(isPasswordStrong && doPasswordsMatch && hasAgreed);
+        }
+        
+        // Add event listeners
+        passwordInput.addEventListener('input', checkFormValidity);
+        passwordConfirmInput.addEventListener('input', function() {
+            if (passwordsMatch()) {
+                passwordConfirmInput.classList.remove('is-invalid');
+                passwordConfirmInput.classList.add('is-valid');
+            } else {
+                passwordConfirmInput.classList.remove('is-valid');
+                passwordConfirmInput.classList.add('is-invalid');
+            }
+            checkFormValidity();
+        });
+        agreeTerms.addEventListener('change', checkFormValidity);
+        
+        // Initial check
+        checkPasswordStrength(passwordInput.value);
+    });
+</script>
 {% endblock %}

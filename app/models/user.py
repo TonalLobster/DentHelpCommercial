@@ -1,29 +1,38 @@
-from app import db, login_manager
-from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
+"""
+User model for authentication and user management.
+"""
 from datetime import datetime
+from flask_login import UserMixin
+from app import db
 
 class User(UserMixin, db.Model):
+    """User model for authentication."""
+    
+    __tablename__ = 'users'
+    
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    license_number = db.Column(db.String(64), nullable=False)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    license_number = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    is_admin = db.Column(db.Boolean, default=False)
     
-    # Relationship with transcriptions
-    transcriptions = db.relationship('Transcription', backref='user', lazy='dynamic')
-    
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-        
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+    # Relationships
+    transcriptions = db.relationship('Transcription', backref='user', lazy=True)
     
     def __repr__(self):
         return f'<User {self.username}>'
-
-
-@login_manager.user_loader
-def load_user(id):
-    return User.query.get(int(id))
+    
+    def to_dict(self):
+        """Convert user to dictionary for API responses."""
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'license_number': self.license_number,
+            'created_at': self.created_at.isoformat(),
+            'is_active': self.is_active,
+            'is_admin': self.is_admin
+        }

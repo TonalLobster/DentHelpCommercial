@@ -1,116 +1,244 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Digital journalföring för tandläkare{% endblock %}
+{% block title %}DentalScribe AI - Transkribera patientsamtal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background-color: #f8f9fa;
+        padding: 5rem 0;
+        border-radius: 10px;
+        margin-bottom: 3rem;
+    }
+    
+    .hero-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.25rem;
+        color: #6c757d;
+        margin-bottom: 2rem;
+    }
+    
+    .feature-card {
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .feature-icon {
+        font-size: 2.5rem;
+        color: #0d6efd;
+        margin-bottom: 1.5rem;
+    }
+    
+    .testimonial {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+        padding: 1.5rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .testimonial-author {
+        font-weight: 600;
+        margin-top: 1rem;
+    }
+    
+    .testimonial-role {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .cta-section {
+        background-color: #e9ecef;
+        padding: 4rem 0;
+        border-radius: 10px;
+        margin: 3rem 0;
+    }
+    
+    .cta-title {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    
+    .cta-text {
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="relative">
-    <div class="max-w-7xl mx-auto">
-        <div class="relative sm:overflow-hidden">
-            <div class="relative px-4 py-16 sm:px-6 sm:py-24 lg:py-32 lg:px-8">
-                <h1 class="text-center text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-                    <span class="block text-blue-600">DentalScribe AI</span>
-                    <span class="block text-gray-900 mt-2">Journalföring för den moderna tandläkaren</span>
-                </h1>
-                <p class="mt-6 max-w-lg mx-auto text-center text-xl text-gray-500 sm:max-w-3xl">
-                    Spara tid och förbättra dokumentationen genom att låta AI transkribera och sammanfatta dina patientmöten.
-                </p>
-                <div class="mt-10 max-w-sm mx-auto sm:max-w-none sm:flex sm:justify-center">
+<!-- Hero Section -->
+<section class="hero-section text-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h1 class="hero-title">DentalScribe AI</h1>
+                <p class="hero-subtitle">Effektiv transkribering och analys av patientsamtal för tandläkare</p>
+                <div class="d-flex justify-content-center gap-3">
                     {% if current_user.is_authenticated %}
-                    <div class="space-y-4 sm:space-y-0 sm:mx-auto sm:inline-grid sm:grid-cols-1 sm:gap-5">
-                        <a href="{{ url_for('main.dashboard') }}" 
-                           class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 sm:px-8">
-                            Gå till dashboard
-                        </a>
-                    </div>
+                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary btn-lg">Gå till Dashboard</a>
                     {% else %}
-                    <div class="space-y-4 sm:space-y-0 sm:mx-auto sm:inline-grid sm:grid-cols-2 sm:gap-5">
-                        <a href="{{ url_for('auth.register') }}" 
-                           class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 sm:px-8">
-                            Kom igång
-                        </a>
-                        <a href="{{ url_for('auth.login') }}" 
-                           class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-500 hover:bg-indigo-600 sm:px-8">
-                            Logga in
-                        </a>
-                    </div>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">Logga in</a>
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-outline-primary btn-lg">Registrera dig</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-</div>
+</section>
 
-<div class="py-12 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="lg:text-center">
-            <h2 class="text-base text-blue-600 font-semibold tracking-wide uppercase">Funktioner</h2>
-            <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-                Enklare journalföring med AI
-            </p>
-            <p class="mt-4 max-w-2xl text-xl text-gray-500 lg:mx-auto">
-                DentalScribe AI hjälper dig att dokumentera patientmöten snabbare och mer detaljerat.
-            </p>
-        </div>
-
-        <div class="mt-10">
-            <dl class="space-y-10 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
+<!-- Features Section -->
+<section class="features-section mb-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Våra funktioner</h2>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="col">
+                <div class="card feature-card shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="feature-icon">
+                            <i class="fas fa-microphone-alt"></i>
                         </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Röstinspelning och transkribering</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Spela in dina patientsamtal direkt i webbläsaren eller ladda upp ljudfiler för automatisk transkribering.
-                    </dd>
+                        <h4 class="card-title">Rösttranskribering</h4>
+                        <p class="card-text">Transkribera patientsamtal automatiskt med högprecisions AI. Stöd för inspelning direkt i appen eller uppladdning av ljudfiler.</p>
+                    </div>
                 </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
+            </div>
+            <div class="col">
+                <div class="card feature-card shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="feature-icon">
+                            <i class="fas fa-clipboard-list"></i>
                         </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">AI-genererade sammanfattningar</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Automatisk strukturering av konsultationer med patientproblem, kliniska fynd, diagnos och behandlingsplan.
-                    </dd>
+                        <h4 class="card-title">AI-sammanfattning</h4>
+                        <p class="card-text">Automatisk strukturerad sammanfattning av patientbesök med anamnes, status, diagnos och åtgärd enligt dental standard.</p>
+                    </div>
                 </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                            </svg>
+            </div>
+            <div class="col">
+                <div class="card feature-card shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="feature-icon">
+                            <i class="fas fa-file-export"></i>
                         </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Säker lagring</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Alla transkriptioner och patientdata lagras säkert och är tillgängliga när som helst.
-                    </dd>
+                        <h4 class="card-title">Export & Integration</h4>
+                        <p class="card-text">Exportera journalanteckningar till olika format. Möjlighet till integration med ledande journalsystem.</p>
+                    </div>
                 </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                            </svg>
-                        </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Smidig integration</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Enkelt att använda och integreras sömlöst i ditt befintliga arbetsflöde.
-                    </dd>
-                </div>
-            </dl>
+            </div>
         </div>
     </div>
-</div>
+</section>
+
+<!-- How It Works Section -->
+<section class="how-it-works mb-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Hur det fungerar</h2>
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <img src="https://via.placeholder.com/600x400" alt="DentalScribe Demo" class="img-fluid rounded shadow">
+            </div>
+            <div class="col-md-6">
+                <div class="steps">
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <span class="fw-bold">1</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4>Spela in eller ladda upp</h4>
+                            <p>Spela in patientsamtalet direkt i appen eller ladda upp en befintlig ljudfil.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <span class="fw-bold">2</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4>AI-transkribering</h4>
+                            <p>Vår AI transkriberar samtalet med hög precision på svenska.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex mb-4">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <span class="fw-bold">3</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4>Strukturerad sammanfattning</h4>
+                            <p>Få en journalfärdig sammanfattning med anamnes, status, diagnos och åtgärd.</p>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <span class="fw-bold">4</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4>Exportera till journal</h4>
+                            <p>Spara tid genom att exportera resultatet direkt till ditt journalsystem.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Section -->
+<section class="testimonials-section mb-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Vad tandläkare säger</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="testimonial">
+                    <p>"DentalScribe har revolutionerat min dokumentationsprocess. Jag sparar minst 10 minuter per patient och får mer tid för faktisk tandvård."</p>
+                    <div class="testimonial-author">Anna Lindberg</div>
+                    <div class="testimonial-role">Allmäntandläkare, Stockholm</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="testimonial">
+                    <p>"Den strukturerade sammanfattningen följer exakt det format vi använder i vår praktik. AI:n förstår dental terminologi imponerande väl."</p>
+                    <div class="testimonial-author">Johan Svensson</div>
+                    <div class="testimonial-role">Klinikcef, Göteborg</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section text-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h2 class="cta-title">Modernisera din praktik idag</h2>
+                <p class="cta-text">Anslut dig till hundratals tandläkare som sparar tid och förbättrar sin dokumentationsprocess med DentalScribe AI.</p>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('main.transcribe') }}" class="btn btn-primary btn-lg">Skapa din första transkription</a>
+                {% else %}
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">Börja gratis</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}
