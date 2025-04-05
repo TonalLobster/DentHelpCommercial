@@ -18,6 +18,14 @@ login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 csrf = CSRFProtect()
 
+# Add this import
+from app.models.user import User
+
+# Add user loader function
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 def create_app():
     # Create and configure the app
     app = Flask(__name__)
@@ -45,7 +53,7 @@ def create_app():
     if os.environ.get('FLASK_ENV') == 'production':
         Talisman(app, content_security_policy=None)
     
-    # Register blueprints - FIXED: use the correct blueprint names as defined in the route files
+    # Register blueprints
     from app.routes.auth import auth
     app.register_blueprint(auth)
     
