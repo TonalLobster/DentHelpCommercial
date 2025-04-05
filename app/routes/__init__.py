@@ -48,7 +48,7 @@ def create_app():
         Talisman(app, content_security_policy=None)
     
     # Register blueprints
-    from app.routes.auth import auth_bp
+    from app.routes.auth import auth as auth_bp
     app.register_blueprint(auth_bp)
     
     from app.routes.main import main_bp
