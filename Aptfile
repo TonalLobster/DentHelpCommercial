@@ -1,4 +1,4 @@
-ffmpeg-tools
+ffmpeg
 libavcodec-extra
 libavformat-dev
 libavutil-dev
