@@ -1,2 +1,6 @@
-ffmpeg
+ffmpeg-tools
 libavcodec-extra
+libavformat-dev
+libavutil-dev
+libswscale-dev
+libavdevice-dev
