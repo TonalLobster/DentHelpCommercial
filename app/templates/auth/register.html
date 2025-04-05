@@ -93,55 +93,70 @@
             </div>
             
             <form method="post" action="{{ url_for('auth.register') }}">
-                <div class="form-floating">
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Användarnamn" required>
-                    <label for="username">Användarnamn</label>
-                </div>
+                {{ form.hidden_tag() }}  {# This adds the CSRF token #}
                 
                 <div class="form-floating">
-                    <input type="email" class="form-control" id="email" name="email" placeholder="E-post" required>
-                    <label for="email">E-post</label>
-                </div>
-                
-                <div class="form-floating">
-                    <input type="text" class="form-control" id="license_number" name="license_number" placeholder="Tandläkar-ID" required>
-                    <label for="license_number">Tandläkar-ID / Legitimationsnummer</label>
-                    <div class="form-text">Ange ditt tandläkar-ID eller legitimationsnummer.</div>
+                    {{ form.username(class="form-control", placeholder="Användarnamn") }}
+                    <label for="{{ form.username.id }}">Användarnamn</label>
+                    {% if form.username.errors %}
+                        <div class="text-danger">
+                            {% for error in form.username.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="form-floating">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Lösenord" required>
-                    <label for="password">Lösenord</label>
-                    <div class="password-strength">
-                        <div class="password-strength-bar" id="password-strength-bar"></div>
-                    </div>
-                    <div class="password-strength-text" id="password-strength-text"></div>
+                    {{ form.email(class="form-control", placeholder="E-post") }}
+                    <label for="{{ form.email.id }}">E-post</label>
+                    {% if form.email.errors %}
+                        <div class="text-danger">
+                            {% for error in form.email.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="form-floating">
-                    <input type="password" class="form-control" id="password_confirm" name="password_confirm" placeholder="Bekräfta lösenord" required>
-                    <label for="password_confirm">Bekräfta lösenord</label>
+                    {{ form.license_number(class="form-control", placeholder="Tandläkar-ID") }}
+                    <label for="{{ form.license_number.id }}">Tandläkar-ID / Legitimationsnummer</label>
+                    {% if form.license_number.errors %}
+                        <div class="text-danger">
+                            {% for error in form.license_number.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 
-                <div class="requirements mb-3">
-                    <p class="mb-1">Lösenordet måste innehålla:</p>
-                    <ul>
-                        <li id="length">Minst 8 tecken</li>
-                        <li id="capital">Minst en stor bokstav</li>
-                        <li id="number">Minst en siffra</li>
-                        <li id="special">Minst ett specialtecken</li>
-                    </ul>
+                <div class="form-floating">
+                    {{ form.password(class="form-control", placeholder="Lösenord") }}
+                    <label for="{{ form.password.id }}">Lösenord</label>
+                    {% if form.password.errors %}
+                        <div class="text-danger">
+                            {% for error in form.password.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" value="agree" id="agree_terms" name="agree_terms" required>
-                    <label class="form-check-label" for="agree_terms">
-                        Jag godkänner <a href="#" target="_blank">användarvillkoren</a> och <a href="#" target="_blank">integritetspolicyn</a>
-                    </label>
+                <div class="form-floating">
+                    {{ form.password_confirm(class="form-control", placeholder="Bekräfta lösenord") }}
+                    <label for="{{ form.password_confirm.id }}">Bekräfta lösenord</label>
+                    {% if form.password_confirm.errors %}
+                        <div class="text-danger">
+                            {% for error in form.password_confirm.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg" id="register-button" disabled>Registrera</button>
+                    {{ form.submit(class="btn btn-primary btn-lg") }}
                 </div>
             </form>
             
