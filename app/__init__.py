@@ -45,12 +45,12 @@ def create_app():
     if os.environ.get('FLASK_ENV') == 'production':
         Talisman(app, content_security_policy=None)
     
-    # Register blueprints
-    from app.routes.auth import auth_bp
-    app.register_blueprint(auth_bp)
+    # Register blueprints - FIXED: use the correct blueprint names as defined in the route files
+    from app.routes.auth import auth
+    app.register_blueprint(auth)
     
-    from app.routes.main import main_bp
-    app.register_blueprint(main_bp)
+    from app.routes.main import main
+    app.register_blueprint(main)
     
     # Ensure the instance folder exists
     os.makedirs(app.instance_path, exist_ok=True)
@@ -64,7 +64,7 @@ def create_app():
     register_commands(app)
     
     # Register error handlers
-    from app.error_handlers import register_error_handlers
+    from app.utils.error_handlers import register_error_handlers
     register_error_handlers(app)
     
     return app
