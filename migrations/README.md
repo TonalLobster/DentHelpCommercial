@@ -1,1 +1,1 @@
-Generic single-database configuration for Flask-Migrate.
+# Database Migrations
