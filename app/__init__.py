@@ -30,18 +30,28 @@ def create_app():
     # Create and configure the app
     app = Flask(__name__)
     
+    # Get the database URL
+    database_url = os.environ.get('DATABASE_URL', 'postgresql://localhost/dental_scribe')
+    
+    # Ensure the URL uses postgresql://
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    # Add SSL parameters to force a secure connection for production
+    if os.environ.get('FLASK_ENV') == 'production':
+        if '?' not in database_url:
+            database_url += '?sslmode=require'
+        elif 'sslmode' not in database_url:
+            database_url += '&sslmode=require'
+    
     # Configure app
     app.config.from_mapping(
         SECRET_KEY=os.environ.get('SECRET_KEY', 'default-dev-key'),
-        SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL', 'postgresql://localhost/dental_scribe'),
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY'),
         VALID_LICENSES=os.environ.get('VALID_LICENSES', '').split(',')
     )
-    
-    # Fix Heroku PostgreSQL URL (they use 'postgres://' instead of 'postgresql://')
-    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-        app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
     
     # Initialize extensions with the app
     db.init_app(app)
