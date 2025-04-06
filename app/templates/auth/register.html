@@ -93,7 +93,8 @@
             </div>
             
             <form method="post" action="{{ url_for('auth.register') }}">
-                {{ form.hidden_tag() }}  {# This adds the CSRF token #}
+                {{ form.csrf_token }}  {# Explicit CSRF token #}
+                {{ form.hidden_tag() }}  {# Additional hidden fields #}
                 
                 <div class="form-floating">
                     {{ form.username(class="form-control", placeholder="Användarnamn") }}

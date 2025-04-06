@@ -63,24 +63,25 @@
             </div>
             
             <form method="post" action="{{ url_for('auth.login') }}">
-                <div class="form-floating">
-                    <input type="text" class="form-control" id="username" name="username" placeholder="Användarnamn" required>
-                    <label for="username">Användarnamn</label>
+                {{ form.hidden_tag() }}
+                <div class="form-floating mb-3">
+                    {{ form.username(class="form-control", placeholder="Användarnamn") }}
+                    <label for="{{ form.username.id }}">Användarnamn</label>
                 </div>
-                <div class="form-floating">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Lösenord" required>
-                    <label for="password">Lösenord</label>
+                <div class="form-floating mb-3">
+                    {{ form.password(class="form-control", placeholder="Lösenord") }}
+                    <label for="{{ form.password.id }}">Lösenord</label>
                 </div>
                 
                 <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" value="remember" id="remember_me" name="remember">
-                    <label class="form-check-label" for="remember_me">
+                    {{ form.remember(class="form-check-input") }}
+                    <label class="form-check-label" for="{{ form.remember.id }}">
                         Kom ihåg mig
                     </label>
                 </div>
                 
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Logga in</button>
+                    {{ form.submit(class="btn btn-primary btn-lg") }}
                 </div>
             </form>
             

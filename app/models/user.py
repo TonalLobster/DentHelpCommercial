@@ -4,7 +4,7 @@ User model for authentication and user management.
 from datetime import datetime
 from flask_login import UserMixin
 from app import db
-
+from werkzeug.security import generate_password_hash, check_password_hash
 class User(UserMixin, db.Model):
     """User model for authentication."""
     
@@ -21,6 +21,14 @@ class User(UserMixin, db.Model):
     
     # Relationships
     transcriptions = db.relationship('Transcription', backref='user', lazy=True)
+    
+    def set_password(self, password):
+        """Set password hash for user."""
+        self.password = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check if password is correct."""
+        return check_password_hash(self.password, password)
     
     def __repr__(self):
         return f'<User {self.username}>'

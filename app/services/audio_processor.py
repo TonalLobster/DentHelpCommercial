@@ -112,10 +112,11 @@ def process_audio(audio_file):
 def optimize_for_whisper(input_path, max_size_mb=24):
     """
     Optimizes an audio file for Whisper API by:
-    1. Removing silence
-    2. Normalizing audio
-    3. Converting to mono 16kHz
-    4. Exporting as mp3
+    1. Identifying and preserving speech segments
+    2. Removing silence 
+    3. Normalizing audio
+    4. Converting to mono 16kHz
+    5. Exporting as mp3
     
     Args:
         input_path: Path to the input file
@@ -138,44 +139,48 @@ def optimize_for_whisper(input_path, max_size_mb=24):
             logger.error(f"Could not load audio file: {str(e)}")
             raise RuntimeError(f"Could not load audio file: {str(e)}")
         
-        logger.info(f"Loaded audio: {len(y)/sr}s, {sr}Hz")
+        # Log original audio details
+        original_duration = len(y) / sr
+        logger.info(f"Loaded audio: {original_duration:.2f}s, {sr}Hz")
         
-        # Remove silence
+        # Remove silence, preserving speech segments
         non_silent = librosa.effects.split(y, top_db=30)
         
         if len(non_silent) == 0:
-            logger.info("No non-silent segments found, using whole file")
+            logger.warning("No non-silent segments found, using whole file")
             processed = y
         else:
-            logger.info(f"Found {len(non_silent)} non-silent segments")
+            # Concatenate only non-silent segments
             processed = np.concatenate([y[start:end] for start, end in non_silent])
             
-            # Add a bit of silence at beginning and end
-            silence_samples = int(0.3 * sr)
+            # Add small silence buffers
+            silence_samples = int(0.5 * sr)
             silence = np.zeros(silence_samples)
             processed = np.concatenate([silence, processed, silence])
-            
-            logger.info(f"After silence removal: {len(processed)/sr}s")
+        
+        # Calculate actual speech duration
+        speech_duration = len(processed) / sr
+        logger.info(f"Preserved speech duration: {speech_duration:.2f}s")
         
         # Normalize audio
         processed = librosa.util.normalize(processed)
         
-        # Resample to 16kHz mono
+        # Resample to 16kHz if needed
         if sr != 16000:
             processed = librosa.resample(processed, orig_sr=sr, target_sr=16000)
             sr = 16000
-            logger.info(f"Resampled to: {len(processed)/sr}s, 16000Hz")
         
-        # Create a unique filename for the output file
-        output_path = os.path.join(tempfile.gettempdir(), f"processed_audio_{os.getpid()}_{np.random.randint(1000, 9999)}.mp3")
+        # Create unique output filename
+        output_path = os.path.join(
+            tempfile.gettempdir(), 
+            f"processed_audio_{os.getpid()}_{np.random.randint(1000, 9999)}.mp3"
+        )
         
         # Ensure temp directory exists
         os.makedirs(tempfile.gettempdir(), exist_ok=True)
         
         # Export with compression
         sf.write(output_path, processed, sr, format='mp3', subtype='VORBIS')
-        
-        logger.info(f"Exported to: {output_path}")
         
         # Check file size
         if os.path.exists(output_path):
@@ -202,9 +207,6 @@ if __name__ == "__main__":
         test_path = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
         
         # Generate silence (zeros) and save as WAV
-        import soundfile as sf
-        import numpy as np
-        
         sample_rate = 16000
         duration = 1  # seconds
         samples = np.zeros(int(sample_rate * duration))
