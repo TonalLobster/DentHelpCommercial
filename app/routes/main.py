@@ -4,6 +4,7 @@ Main routes for the DentalScribe application.
 import os
 import json
 import tempfile
+import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -43,55 +44,84 @@ def transcribe():
     form = FlaskForm()
     
     if request.method == 'POST':
+        current_app.logger.info("POST-förfrågan mottagen för transkribering")
+        
         # Check if the post request has the file part
         if 'audio' not in request.files:
-            flash('No file part', 'error')
+            current_app.logger.warning("Ingen fil i förfrågan")
+            flash('Ingen fil hittades i förfrågan', 'error')
             return redirect(request.url)
         
         file = request.files['audio']
+        current_app.logger.info(f"Fil mottagen: {file.filename}")
         
-        # If user does not select file, browser also
-        # submit an empty part without filename
+        # If user does not select file, browser also submit an empty part without filename
         if file.filename == '':
-            flash('No selected file', 'error')
+            current_app.logger.warning("Filnamn är tomt")
+            flash('Ingen fil vald', 'error')
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
             try:
+                current_app.logger.info("Börjar bearbeta ljudfil...")
+                
                 # Process the audio file
                 processed_audio, processing_error = process_audio(file)
                 
                 if processing_error:
-                    current_app.logger.warning(f"Audio processing warning: {processing_error}")
+                    current_app.logger.warning(f"Varning vid ljudbearbetning: {processing_error}")
+                    flash(f'Varning vid ljudbearbetning: {processing_error}', 'warning')
                     # Continue anyway
                 
                 # Transcribe the audio
+                current_app.logger.info("Startar transkribering med OpenAI...")
                 transcription_text = transcribe_audio(processed_audio)
+                current_app.logger.info(f"Transkription slutförd, längd: {len(transcription_text)} tecken")
                 
                 # Generate summary
+                current_app.logger.info("Genererar sammanfattning...")
                 summary_dict = generate_summary(transcription_text)
+                current_app.logger.info("Sammanfattning genererad")
                 
                 # Create new transcription record
+                title = request.form.get('title')
+                if not title or title.strip() == '':
+                    title = 'Transkription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                    
+                current_app.logger.info(f"Skapar transkriptionspost med titel: {title}")
                 new_transcription = Transcription(
-                    title=request.form.get('title', 'Untitled Transcription'),
+                    title=title,
                     user_id=current_user.id,
                     transcription_text=transcription_text,
                     summary=json.dumps(summary_dict, ensure_ascii=False)
                 )
                 
                 # Save to database
+                current_app.logger.info("Sparar till databas...")
                 db.session.add(new_transcription)
                 db.session.commit()
+                current_app.logger.info(f"Transkription sparad med ID: {new_transcription.id}")
                 
-                flash('Transcription created successfully!', 'success')
+                flash('Transkription skapad framgångsrikt!', 'success')
                 return redirect(url_for('main.view_transcription', id=new_transcription.id))
                 
+            except ValueError as ve:
+                current_app.logger.error(f"Valideringsfel: {str(ve)}")
+                flash(f'Valideringsfel: {str(ve)}', 'error')
+                return redirect(request.url)
+                
+            except RuntimeError as re:
+                current_app.logger.error(f"Körningsfel: {str(re)}")
+                flash(f'Körningsfel: {str(re)}', 'error')
+                return redirect(request.url)
+                
             except Exception as e:
-                flash(f'Error: {str(e)}', 'error')
-                current_app.logger.error(f"Transcription error: {str(e)}")
+                current_app.logger.error(f"Oväntat fel vid transkribering: {str(e)}", exc_info=True)
+                flash(f'Ett oväntat fel inträffade: {str(e)}', 'error')
                 return redirect(request.url)
         else:
-            flash('File type not allowed. Please upload a WAV, MP3, M4A, or OGG file.', 'error')
+            current_app.logger.warning(f"Otillåten filtyp: {file.filename}")
+            flash('Filtypen är inte tillåten. Vänligen ladda upp WAV, MP3, M4A eller OGG.', 'error')
             return redirect(request.url)
     
     return render_template('main/transcribe.html', form=form)
