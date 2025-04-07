@@ -7,6 +7,7 @@ import tempfile
 from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from flask_wtf import FlaskForm
 
 from app.services.audio_processor import process_audio
 from app.services.transcription_service import transcribe_audio
@@ -38,6 +39,9 @@ def dashboard():
 @login_required
 def transcribe():
     """Page for creating new transcriptions."""
+    # Create a simple form for CSRF protection
+    form = FlaskForm()
+    
     if request.method == 'POST':
         # Check if the post request has the file part
         if 'audio' not in request.files:
@@ -90,7 +94,7 @@ def transcribe():
             flash('File type not allowed. Please upload a WAV, MP3, M4A, or OGG file.', 'error')
             return redirect(request.url)
     
-    return render_template('main/transcribe.html')
+    return render_template('main/transcribe.html', form=form)
 
 @main.route('/transcriptions/<int:id>')
 @login_required

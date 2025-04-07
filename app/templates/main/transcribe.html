@@ -105,6 +105,7 @@
                     <div class="tab-pane fade show active" id="record" role="tabpanel">
                         <div class="record-container">
                             <form id="recording-form" method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
+                                {{ form.csrf_token }}
                                 <div class="mb-3">
                                     <label for="recording-title" class="form-label">Titel</label>
                                     <input type="text" class="form-control" id="recording-title" name="title" placeholder="Ange en titel för transkriptionen">
@@ -138,6 +139,7 @@
                     <!-- Upload Tab -->
                     <div class="tab-pane fade" id="upload" role="tabpanel">
                         <form method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
+                            {{ form.csrf_token }}
                             <div class="mb-3">
                                 <label for="title" class="form-label">Titel</label>
                                 <input type="text" class="form-control" id="title" name="title" placeholder="Ange en titel för transkriptionen">
