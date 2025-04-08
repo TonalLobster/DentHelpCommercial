@@ -9,7 +9,6 @@ from flask import Blueprint, render_template, request, jsonify, current_app, fla
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
-
 from app.services.audio_processor import process_audio
 from app.services.transcription_service import transcribe_audio
 from app.services.summary_service import generate_summary
@@ -20,7 +19,7 @@ main = Blueprint('main', __name__)
 
 def allowed_file(filename):
     """Check if the file has an allowed extension."""
-    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'ogg'}
+    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'ogg', 'webm', 'mp4'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @main.route('/')

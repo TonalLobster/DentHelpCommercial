@@ -3,10 +3,11 @@ import tempfile
 import logging
 from io import BytesIO
 import numpy as np
-import librosa
-import soundfile as sf
+from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
+from pydub.effects import low_pass_filter
 
-# Configure logging
+# Konfigurera loggning
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -14,88 +15,88 @@ logging.basicConfig(
 logger = logging.getLogger("audio_processor")
 
 def save_uploaded_file(audio_file):
-    """Saves an uploaded file to a temporary file on disk."""
+    """Sparar en uppladdad fil till en temporär fil på disk."""
     try:
-        # Determine file extension
+        # Bestäm filändelse
         name = getattr(audio_file, 'name', 'audio_file')
         file_extension = os.path.splitext(name)[1] if '.' in name else '.wav'
         
-        # Create temporary file
+        # Skapa temporär fil
         with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as temp_file:
             temp_path = temp_file.name
             
-            # Read content from file
+            # Läs innehållet från filen
             if hasattr(audio_file, 'read'):
-                audio_file.seek(0)  # Reset read position
+                audio_file.seek(0)  # Återställ läsposition
                 content = audio_file.read()
             elif hasattr(audio_file, 'getvalue'):
                 content = audio_file.getvalue()
             else:
                 content = audio_file
                 
-            # Write to temporary file
+            # Skriv till temporär fil
             temp_file.write(content)
             
-            # Reset read position for potential reuse
+            # Återställ läsposition för eventuell återanvändning
             if hasattr(audio_file, 'seek'):
                 audio_file.seek(0)
         
-        logger.info(f"Saved uploaded file to: {temp_path}")
+        logger.info(f"Sparade uppladdad fil till: {temp_path}")
         return temp_path
     except Exception as e:
-        logger.error(f"Error saving uploaded file: {str(e)}")
+        logger.error(f"Fel vid sparande av uppladdad fil: {str(e)}")
         raise
 
 def process_audio(audio_file):
     """
-    Processes an audio file for optimal transcription using librosa.
+    Bearbetar en ljudfil för optimal transkribering.
     
     Args:
-        audio_file: File-like object with audio data
+        audio_file: Fil-liknande objekt med ljuddata
         
     Returns:
-        BytesIO: Optimized audio data ready for transcription
+        BytesIO: Optimerad ljuddata redo för transkribering
     """
-    logger.info("Starting audio processing...")
+    logger.info("Startar ljudbearbetning...")
     
     try:
-        # Handle different types of input
+        # Hantera olika typer av indata
         if hasattr(audio_file, 'name'):
-            logger.info(f"Processing file of type: {type(audio_file).__name__}, name: {audio_file.name}")
+            logger.info(f"Bearbetar fil av typ: {type(audio_file).__name__}, namn: {audio_file.name}")
         else:
-            logger.info(f"Processing file of type: {type(audio_file).__name__}")
+            logger.info(f"Bearbetar fil av typ: {type(audio_file).__name__}")
         
-        # Save file temporarily to avoid compatibility issues
+        # Spara filen tillfälligt för att undvika kompatibilitetsproblem
         temp_path = save_uploaded_file(audio_file)
         
         try:
-            # Process the file with optimize_for_whisper
+            # Bearbeta filen med optimize_for_whisper
             processed_path = optimize_for_whisper(temp_path)
             
-            # Check that file exists and has content
+            # Kontrollera att filen existerar och har innehåll
             if not os.path.exists(processed_path) or os.path.getsize(processed_path) == 0:
-                logger.error(f"Processed file is missing or empty: {processed_path}")
-                raise RuntimeError("Processed audio file is empty or failed to be created")
+                logger.error(f"Bearbetad fil saknas eller är tom: {processed_path}")
+                raise RuntimeError("Bearbetad ljudfil är tom eller misslyckades att skapas")
             
-            # Read the processed file
+            # Läs in den bearbetade filen
             with open(processed_path, 'rb') as f:
                 processed_audio = BytesIO(f.read())
                 processed_audio.name = os.path.basename(processed_path)
             
-            # Remove temporary files
+            # Ta bort temporära filer
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             if os.path.exists(processed_path) and processed_path != temp_path:
                 os.remove(processed_path)
             
-            logger.info("Audio processing completed successfully")
+            logger.info("Ljudbearbetning slutförd framgångsrikt")
             return processed_audio, None
             
         except Exception as e:
-            logger.error(f"Error during processing: {str(e)}")
+            logger.error(f"Fel vid bearbetning: {str(e)}")
             
-            # Fallback: if processing fails, return original file
-            logger.info("Using unprocessed file as fallback")
+            # Fallback: om bearbetningen misslyckas, returnera ursprungliga filen
+            logger.info("Använder obearbetad fil som fallback")
             with open(temp_path, 'rb') as f:
                 original_audio = BytesIO(f.read())
                 original_audio.name = os.path.basename(temp_path)
@@ -106,125 +107,185 @@ def process_audio(audio_file):
             return original_audio, str(e)
             
     except Exception as e:
-        logger.error(f"Critical error in process_audio: {str(e)}")
-        raise RuntimeError(f"Audio processing error: {str(e)}")
+        logger.error(f"Kritiskt fel i process_audio: {str(e)}")
+        raise RuntimeError(f"Ljudbearbetningsfel: {str(e)}")
 
 def optimize_for_whisper(input_path, max_size_mb=24):
     """
-    Optimizes an audio file for Whisper API by:
-    1. Identifying and preserving speech segments
-    2. Removing silence 
-    3. Normalizing audio
-    4. Converting to mono 16kHz
-    5. Exporting as mp3
+    Optimerar en ljudfil för Whisper API genom att:
+    1. Identifiera och bevara talsegment
+    2. Ta bort tystnad
+    3. Normalisera ljudet
+    4. Konvertera till mono 16kHz
+    5. Exportera som mp3
     
     Args:
-        input_path: Path to the input file
-        max_size_mb: Maximum file size in MB
+        input_path: Sökväg till indatafilen
+        max_size_mb: Maximal filstorlek i MB
         
     Returns:
-        str: Path to the optimized file
+        str: Sökväg till den optimerade filen
     """
     try:
-        logger.info(f"Optimizing file for Whisper: {input_path}")
+        logger.info(f"Optimerar fil för Whisper: {input_path}")
         
-        # Verify file exists
+        # Verifiera att filen existerar
         if not os.path.exists(input_path):
-            raise RuntimeError(f"Input file does not exist: {input_path}")
+            raise RuntimeError(f"Indatafilen existerar inte: {input_path}")
         
-        # Load the audio file
+        # Läs in ljudfilen
         try:
-            y, sr = librosa.load(input_path, sr=None)
+            audio = AudioSegment.from_file(input_path)
         except Exception as e:
-            logger.error(f"Could not load audio file: {str(e)}")
-            raise RuntimeError(f"Could not load audio file: {str(e)}")
-        
-        # Log original audio details
-        original_duration = len(y) / sr
-        logger.info(f"Loaded audio: {original_duration:.2f}s, {sr}Hz")
-        
-        # Remove silence, preserving speech segments
-        non_silent = librosa.effects.split(y, top_db=30)
-        
-        if len(non_silent) == 0:
-            logger.warning("No non-silent segments found, using whole file")
-            processed = y
-        else:
-            # Concatenate only non-silent segments
-            processed = np.concatenate([y[start:end] for start, end in non_silent])
+            logger.error(f"Kunde inte läsa in ljudfil: {str(e)}")
             
-            # Add small silence buffers
-            silence_samples = int(0.5 * sr)
-            silence = np.zeros(silence_samples)
-            processed = np.concatenate([silence, processed, silence])
+            # Försök med olika format
+            for format in ['wav', 'mp3', 'm4a', 'ogg']:
+                try:
+                    logger.info(f"Försöker läsa in som {format}")
+                    audio = AudioSegment.from_file(input_path, format=format)
+                    break
+                except Exception:
+                    continue
+            else:
+                raise RuntimeError(f"Kunde inte läsa in ljudfilen i något av de vanligaste formaten: {str(e)}")
         
-        # Calculate actual speech duration
-        speech_duration = len(processed) / sr
-        logger.info(f"Preserved speech duration: {speech_duration:.2f}s")
+        # Logga ursprunglig ljudinformation
+        original_duration = len(audio) / 1000
+        logger.info(f"Inläst ljud: {original_duration:.2f}s, {audio.channels} kanaler, {audio.frame_rate}Hz")
         
-        # Normalize audio
-        processed = librosa.util.normalize(processed)
+        # Ta bort tystnad, bevara talsegment
+        nonsilent = detect_nonsilent(
+            audio, 
+            silence_thresh=-45,
+            min_silence_len=1000,
+            seek_step=100
+        )
         
-        # Resample to 16kHz if needed
-        if sr != 16000:
-            processed = librosa.resample(processed, orig_sr=sr, target_sr=16000)
-            sr = 16000
+        if len(nonsilent) == 0:
+            logger.warning("Inga icke-tysta segment hittades, använder hela filen")
+            processed = audio
+        else:
+            # Konkatanera endast icke-tysta segment
+            processed = AudioSegment.empty()
+            for start, end in nonsilent:
+                if len(processed) > 0:
+                    processed += AudioSegment.silent(duration=100)
+                processed += audio[start:end]
+            
+            # Lägg till små tystandsbuffertar
+            processed = AudioSegment.silent(duration=300) + processed + AudioSegment.silent(duration=300)
         
-        # Create unique output filename
+        # Beräkna faktisk talduration
+        speech_duration = len(processed) / 1000
+        logger.info(f"Bevarad talduration: {speech_duration:.2f}s")
+        
+        # Ljudbearbetning
+        processed = low_pass_filter(processed, 4000)
+        processed = processed.set_channels(1).set_frame_rate(16000)
+        
+        # Skapa unikt filnamn för utdata
         output_path = os.path.join(
             tempfile.gettempdir(), 
             f"processed_audio_{os.getpid()}_{np.random.randint(1000, 9999)}.mp3"
         )
         
-        # Ensure temp directory exists
+        # Säkerställ att temporär katalog existerar
         os.makedirs(tempfile.gettempdir(), exist_ok=True)
         
-        # Export with compression
-        sf.write(output_path, processed, sr, format='mp3', subtype='VORBIS')
+        # Exportera med kompression och bättre felhantering
+        try:
+            logger.info("Försöker exportera med 32k bitrate")
+            processed.export(output_path, format="mp3", bitrate="32k")
+        except Exception as e:
+            logger.error(f"Fel vid export med 32k bitrate: {str(e)}")
+            
+            # Försök med en lägre bitrate
+            try:
+                logger.info("Försöker med lägre bitrate (16k)")
+                processed.export(output_path, format="mp3", bitrate="16k")
+            except Exception as e2:
+                logger.error(f"Fel vid export med 16k bitrate: {str(e2)}")
+                
+                # Försök med ännu lägre bitrate
+                try:
+                    logger.info("Försöker med ännu lägre bitrate (8k)")
+                    processed.export(output_path, format="mp3", bitrate="8k")
+                except Exception as e3:
+                    logger.error(f"Fel vid export med 8k bitrate: {str(e3)}")
+                    
+                    # Sista försök: exportera som wav
+                    wav_path = output_path.replace(".mp3", ".wav")
+                    logger.info(f"Försöker exportera som WAV: {wav_path}")
+                    processed.export(wav_path, format="wav")
+                    output_path = wav_path
         
-        # Check file size
+        # Kontrollera filstorlek
         if os.path.exists(output_path):
             size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            logger.info(f"Final file size: {size_mb:.2f} MB")
+            logger.info(f"Slutlig filstorlek: {size_mb:.2f} MB")
             
-            if size_mb > max_size_mb:
-                logger.warning(f"Warning: File size ({size_mb:.2f} MB) exceeds limit of {max_size_mb} MB")
+            # Om filen fortfarande är för stor, försök med mer aggressiv komprimering
+            if size_mb > max_size_mb and output_path.endswith('.mp3'):
+                logger.warning(f"Varning: Filstorlek ({size_mb:.2f} MB) överstiger gränsen på {max_size_mb} MB")
+                logger.info("Försöker med mer aggressiv komprimering (mono, 8kHz, 8k bitrate)")
+                
+                # Konvertera till mono och lägre samplingshastighet
+                try:
+                    lower_rate = processed.set_frame_rate(8000)
+                    lower_rate_path = output_path.replace(".mp3", "_low.mp3")
+                    lower_rate.export(lower_rate_path, format="mp3", bitrate="8k")
+                    
+                    # Om exporten lyckas, använd den lägre kvalitetsversionen
+                    if os.path.exists(lower_rate_path) and os.path.getsize(lower_rate_path) > 0:
+                        # Ta bort den ursprungliga filen
+                        os.remove(output_path)
+                        output_path = lower_rate_path
+                        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                        logger.info(f"Ny filstorlek efter aggressiv komprimering: {size_mb:.2f} MB")
+                except Exception as e:
+                    logger.error(f"Kunde inte utföra aggressiv komprimering: {str(e)}")
         else:
-            logger.error(f"Output file does not exist: {output_path}")
-            raise RuntimeError(f"Output file could not be created: {output_path}")
+            logger.error(f"Utdatafilen existerar inte: {output_path}")
+            raise RuntimeError(f"Utdatafilen kunde inte skapas: {output_path}")
+        
+        # Dela upp filen om den fortfarande är för stor
+        if size_mb > 24:
+            logger.warning("Filen är fortfarande för stor för Whisper API (>24MB)")
+            logger.info("Denna stora fil kan orsaka problem med Whisper API")
         
         return output_path
         
     except Exception as e:
-        logger.error(f"Optimization error: {str(e)}")
-        raise RuntimeError(f"Optimization error: {str(e)}")
+        logger.error(f"Optimeringsfel: {str(e)}")
+        raise RuntimeError(f"Optimeringsfel: {str(e)}")
 
 # Test module when run directly
 if __name__ == "__main__":
-    logging.info("Testing audio_processor...")
+    logging.info("Testar audio_processor...")
     try:
-        # Create a test file with silence
-        test_path = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+        # Skapa en testfil med tystnad
+        test_audio = AudioSegment.silent(duration=1000)
+        test_audio = test_audio.set_channels(1).set_frame_rate(16000)
+        test_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        test_path = test_file.name
+        test_file.close()
         
-        # Generate silence (zeros) and save as WAV
-        sample_rate = 16000
-        duration = 1  # seconds
-        samples = np.zeros(int(sample_rate * duration))
-        sf.write(test_path, samples, sample_rate)
+        test_audio.export(test_path, format="wav")
         
-        # Test process_audio
+        # Testa process_audio
         with open(test_path, "rb") as f:
             test_bytes = BytesIO(f.read())
             test_bytes.name = "test_audio.wav"
             
             result, error = process_audio(test_bytes)
             if error:
-                logging.error(f"Test failed: {error}")
+                logging.error(f"Test misslyckades: {error}")
             else:
-                logging.info("Test succeeded!")
+                logging.info("Test lyckades!")
         
-        # Clean up
+        # Städa upp
         os.remove(test_path)
         
     except Exception as e:
-        logging.error(f"Test error: {str(e)}")
+        logging.error(f"Testfel: {str(e)}")

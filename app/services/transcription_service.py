@@ -1,5 +1,5 @@
 """
-Transcription service for converting audio to text using OpenAI's Whisper API.
+Transcription service för konvertering av ljud till text med OpenAI Whisper API.
 """
 import os
 import logging
@@ -8,125 +8,126 @@ from io import BytesIO
 import openai
 from flask import current_app
 
-# Konfigurera loggning
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("transcription_service")
+logger = logging.getLogger(__name__)
 
 def get_api_key():
-    """Get OpenAI API key from environment or application config."""
-    # Prioritet: 1. Miljövariabel, 2. App-config
+    """Hämta OpenAI API-nyckel från miljö eller app-konfiguration."""
     if api_key := os.environ.get("OPENAI_API_KEY"):
         logger.info("Använder API-nyckel från miljövariabel")
         return api_key
     
-    if hasattr(current_app, 'config') and (api_key := current_app.config.get('OPENAI_API_KEY')):
-        logger.info("Använder API-nyckel från app-konfiguration")
-        return api_key
+    if hasattr(current_app, 'config') and current_app.config.get('OPENAI_API_KEY'):
+        logger.info("Använder API-nyckel från Flask-app konfiguration")
+        return current_app.config['OPENAI_API_KEY']
     
     logger.warning("Ingen API-nyckel hittades")
     return None
 
 def transcribe_audio(audio_file):
     """
-    Transcribe an audio file using OpenAI's Whisper API.
+    Transkribera en ljudfil med OpenAI Whisper API.
     
     Args:
-        audio_file: A BytesIO object or file-like object with audio data
+        audio_file: Ett BytesIO-objekt eller fil-liknande objekt med ljuddata
         
     Returns:
-        str: Transcribed text
+        str: Transkriberad text
     """
     try:
-        # Try to get API key
+        # Hämta API-nyckel
         api_key = get_api_key()
-        
+            
         if not api_key:
-            error_msg = "OpenAI API key missing. Check environment variables or app configuration."
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError("OpenAI API-nyckel saknas. Kontrollera miljövariabler eller app-konfiguration.")
         
-        # Create client with API key
-        try:
-            client = openai.OpenAI(api_key=api_key)
-            logger.info("OpenAI klient skapad")
-        except Exception as e:
-            logger.error(f"Kunde inte skapa OpenAI-klient: {str(e)}")
-            raise RuntimeError(f"Kunde inte skapa OpenAI-klient: {str(e)}")
+        # Skapa klient med API-nyckel
+        client = openai.OpenAI(api_key=api_key)
+        logger.info("OpenAI klient skapad")
         
-        # Handle different types of input
+        # Hantera olika typer av indata
         temp_file = None
         try:
-            logger.info(f"Processerar ljudfil av typ: {type(audio_file).__name__}")
+            # Logga vad vi arbetar med
+            if isinstance(audio_file, BytesIO):
+                logger.info("Processerar ljudfil av typ: BytesIO")
+            elif hasattr(audio_file, 'read'):
+                logger.info(f"Processerar ljudfil av typ: {type(audio_file).__name__}")
+            else:
+                logger.info(f"Processerar ljudfil av typ: {type(audio_file)}")
             
             if hasattr(audio_file, 'read'):
-                # Reset read head to beginning of file if it's a file-like object
+                # Återställ läshuvudet till början av filen om det är ett filliknande objekt
                 audio_file.seek(0)
                 logger.info("Återställde filpekaren till början")
                 
-                # If it's a file-like object that isn't BytesIO, save it temporarily
+                # Om det är ett filliknande objekt som inte är BytesIO, spara det tillfälligt
                 if not isinstance(audio_file, BytesIO):
-                    logger.info("Sparar fil temporärt (inte BytesIO)")
+                    logger.info("Skapar temporär fil för icke-BytesIO objekt")
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
                     temp_file.write(audio_file.read())
                     temp_file.close()
-                    audio_file.seek(0)  # Reset read head again
-                    logger.info(f"Temporär fil skapad: {temp_file.name} ({os.path.getsize(temp_file.name)} bytes)")
+                    audio_file.seek(0)  # Återställ läshuvudet igen
+                    logger.info(f"Temporär fil skapad: {temp_file.name}")
                     
-                    # Open the temporary file
+                    # Öppna den tillfälliga filen
                     with open(temp_file.name, 'rb') as f:
-                        logger.info("Skickar transkriptionsbegäran till OpenAI (från temp-fil)")
+                        logger.info("Skickar transkriptionsbegäran till OpenAI (från temp file)")
                         transcription = client.audio.transcriptions.create(
                             model="whisper-1",
                             file=f,
-                            language="sv"  # Swedish
+                            language="sv"  # Svenska
                         )
                 else:
-                    # If it's a BytesIO, use it directly
-                    logger.info("Skickar transkriptionsbegäran till OpenAI (direkt BytesIO)")
-                    transcription = client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        language="sv"  # Swedish
-                    )
+                    # Om det är en BytesIO, försök använda den direkt
+                    try:
+                        logger.info("Skickar transkriptionsbegäran till OpenAI (direkt BytesIO)")
+                        transcription = client.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=audio_file,
+                            language="sv"  # Svenska
+                        )
+                    except Exception as e:
+                        logger.error(f"Fel vid direkt BytesIO transaktion: {str(e)}")
+                        
+                        # Fallback: Spara BytesIO till temporär fil
+                        logger.info("Försöker med fallback till temporär fil för BytesIO")
+                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+                        temp_file.write(audio_file.getvalue())
+                        temp_file.close()
+                        audio_file.seek(0)  # Återställ läshuvudet igen
+                        
+                        with open(temp_file.name, 'rb') as f:
+                            logger.info("Skickar transkriptionsbegäran till OpenAI (fallback från BytesIO)")
+                            transcription = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=f,
+                                language="sv"  # Svenska
+                            )
             else:
-                # If it's not a file-like object, assume it's a path
-                logger.info(f"Använder filsökväg: {audio_file}")
+                # Om det inte är ett filliknande objekt, anta att det är en sökväg
+                logger.info(f"Skickar transkriptionsbegäran till OpenAI från sökväg: {audio_file}")
                 with open(audio_file, 'rb') as f:
                     transcription = client.audio.transcriptions.create(
                         model="whisper-1",
                         file=f,
-                        language="sv"  # Swedish
+                        language="sv"  # Svenska
                     )
-            
-            logger.info("Transkription från OpenAI mottagen framgångsrikt")
+                    
+            logger.info("Transkribering slutförd framgångsrikt")
             return transcription.text
             
         finally:
-            # Remove temporary file if created
+            # Ta bort temporär fil om den skapades
             if temp_file and os.path.exists(temp_file.name):
+                logger.info(f"Tar bort temporär fil: {temp_file.name}")
                 os.unlink(temp_file.name)
-                logger.info(f"Temporär fil borttagen: {temp_file.name}")
                 
-    except openai.RateLimitError as e:
-        logger.error(f"OpenAI API rate limit exceeded: {str(e)}")
-        raise RuntimeError(f"API-gränsen för OpenAI överskriden: {str(e)}")
-        
-    except openai.APIError as e:
-        logger.error(f"OpenAI API error: {str(e)}")
-        raise RuntimeError(f"OpenAI API-fel: {str(e)}")
-        
-    except openai.APIConnectionError as e:
-        logger.error(f"OpenAI API connection error: {str(e)}")
-        raise RuntimeError(f"Anslutningsfel till OpenAI API: {str(e)}")
-        
-    except ValueError as e:
-        logger.error(f"Value error during transcription: {str(e)}")
-        raise
-        
+    except openai.OpenAIError as oe:
+        # Logga OpenAI-specifika fel
+        error_msg = f"OpenAI API-fel: Error code: {oe.status_code} - {oe.response or str(oe)}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
     except Exception as e:
-        # Log the actual error for debugging
-        logger.error(f"Unexpected error during transcription: {str(e)}", exc_info=True)
-        raise RuntimeError(f"Error during transcription: {str(e)}")
+        # Logga det faktiska felet för felsökning
+        logger.error(f"Transkriptionsfel: {str(e)}")
+        raise RuntimeError(f"Fel under transkribering: {str(e)}")
