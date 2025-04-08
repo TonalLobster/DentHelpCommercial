@@ -75,6 +75,27 @@
     .processing-spinner {
         display: none;
     }
+    
+    .file-info {
+        margin-top: 10px;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .drag-area {
+        border: 2px dashed #ccc;
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        border-radius: 10px;
+    }
+    
+    .drag-area.active {
+        border-color: #0d6efd;
+        background-color: #f0f7ff;
+    }
 </style>
 {% endblock %}
 
@@ -108,7 +129,7 @@
                                 {{ form.csrf_token }}
                                 <div class="mb-3">
                                     <label for="recording-title" class="form-label">Titel</label>
-                                    <input type="text" class="form-control" id="recording-title" name="title" placeholder="Ange en titel för transkriptionen">
+                                    <input type="text" class="form-control" id="recording-title" name="recording-title" placeholder="Ange en titel för transkriptionen">
                                 </div>
                                 
                                 <div class="mb-4">
@@ -124,11 +145,12 @@
                                 <div id="audio-player-container" style="display: none;">
                                     <audio id="audio-player" controls></audio>
                                     <input type="hidden" name="audio-blob" id="audio-blob">
+                                    <div class="file-info" id="file-size-info"></div>
                                 </div>
                                 
                                 <div class="mt-3">
                                     <button type="submit" id="transcribe-recording" class="btn btn-primary" style="display: none;">
-                                        <span class="processing-spinner spinner-border spinner-border-sm" role="status"></span>
+                                        <span class="processing-spinner spinner-border spinner-border-sm" role="status" style="display: none;"></span>
                                         Transkribera inspelning
                                     </button>
                                 </div>
@@ -138,7 +160,7 @@
                     
                     <!-- Upload Tab -->
                     <div class="tab-pane fade" id="upload" role="tabpanel">
-                        <form method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
+                        <form id="upload-form" method="post" enctype="multipart/form-data" action="{{ url_for('main.transcribe') }}">
                             {{ form.csrf_token }}
                             <div class="mb-3">
                                 <label for="title" class="form-label">Titel</label>
@@ -146,17 +168,21 @@
                             </div>
                             
                             <div class="upload-container mb-4">
-                                <div class="mb-3">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <div class="drag-area" id="drag-area">
+                                    <div class="icon">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    </div>
                                     <h5>Dra och släpp ljudfil här</h5>
                                     <p class="text-muted">eller</p>
-                                    <input type="file" name="audio" id="audio-upload">
-                                    <div class="form-text">Tillåtna format: WAV, MP3, M4A, OGG (max 100MB)</div>
+                                    <button type="button" class="btn btn-outline-primary" id="browse-button">Välj fil</button>
+                                    <input type="file" name="audio" id="audio-upload" style="display: none;">
                                 </div>
+                                <div class="file-info mt-3" id="upload-file-info"></div>
+                                <small class="form-text text-muted">Tillåtna format: WAV, MP3, M4A, OGG (max 100MB)</small>
                             </div>
                             
                             <button type="submit" class="btn btn-primary" id="upload-submit">
-                                <span class="processing-spinner spinner-border spinner-border-sm" role="status"></span>
+                                <span class="processing-spinner spinner-border spinner-border-sm" role="status" style="display: none;"></span>
                                 Transkribera fil
                             </button>
                         </form>
@@ -170,8 +196,23 @@
 
 {% block extra_js %}
 <script>
+    // Enable debug logging
+    const DEBUG = true;
+    
+    function logDebug(message, data) {
+        if (DEBUG) {
+            if (data) {
+                console.log(`[DEBUG] ${message}`, data);
+            } else {
+                console.log(`[DEBUG] ${message}`);
+            }
+        }
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
-        // Audio recording functionality
+        logDebug('Page loaded - Debug mode enabled');
+        
+        // === Recording functionality ===
         const recordButton = document.getElementById('record-button');
         const audioPlayer = document.getElementById('audio-player');
         const audioPlayerContainer = document.getElementById('audio-player-container');
@@ -181,6 +222,7 @@
         const visualizerCtx = visualizer.getContext('2d');
         const recordingForm = document.getElementById('recording-form');
         const audioBlobInput = document.getElementById('audio-blob');
+        const fileSizeInfo = document.getElementById('file-size-info');
         
         let mediaRecorder;
         let audioChunks = [];
@@ -193,16 +235,32 @@
         let source;
         
         // Handle recording button click
-        recordButton.addEventListener('click', function() {
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
-        });
+        if (recordButton) {
+            recordButton.addEventListener('click', function() {
+                if (!isRecording) {
+                    startRecording();
+                } else {
+                    stopRecording();
+                }
+            });
+        } else {
+            console.error('Record button not found!');
+        }
         
         function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
+            logDebug('Starting recording with low bitrate settings');
+            
+            // Request lower sample rate to reduce file size
+            const constraints = {
+                audio: {
+                    channelCount: 1,        // Mono instead of stereo
+                    sampleRate: 16000,      // Lower sample rate (16kHz)
+                    echoCancellation: true,  // Reduce background noise
+                    noiseSuppression: true   // Reduce background noise
+                }
+            };
+            
+            navigator.mediaDevices.getUserMedia(constraints)
                 .then(stream => {
                     audioStream = stream;
                     
@@ -216,8 +274,40 @@
                     // Start visualization
                     visualize();
                     
-                    // Create media recorder instance
-                    mediaRecorder = new MediaRecorder(stream);
+                    // Set up MediaRecorder with MP3 mime type if supported
+                    // Try different formats in order of preference
+                    const mimeTypes = [
+                        'audio/webm;codecs=opus',  // Small file size, good quality
+                        'audio/mp3',               // Good compression
+                        'audio/ogg;codecs=opus',   // Good compression
+                        'audio/webm',              // Default fallback
+                        'audio/wav'                // Last resort
+                    ];
+                    
+                    // Find first supported mime type
+                    let selectedMimeType = '';
+                    for (const type of mimeTypes) {
+                        if (MediaRecorder.isTypeSupported(type)) {
+                            selectedMimeType = type;
+                            break;
+                        }
+                    }
+                    
+                    logDebug(`Using recording format: ${selectedMimeType || 'default'}`);
+                    
+                    // Create recorder with selected mime type and lower bitrate
+                    const options = { 
+                        mimeType: selectedMimeType,
+                        audioBitsPerSecond: 32000  // Lower bitrate = smaller file (32 kbps)
+                    };
+                    
+                    try {
+                        mediaRecorder = new MediaRecorder(stream, options);
+                        logDebug('MediaRecorder created successfully with options', options);
+                    } catch (err) {
+                        logDebug('Error with options, trying without options', err);
+                        mediaRecorder = new MediaRecorder(stream);
+                    }
                     
                     // Start recording
                     mediaRecorder.start();
@@ -234,29 +324,166 @@
                     
                     // Handle data available event
                     mediaRecorder.addEventListener("dataavailable", event => {
+                        logDebug(`Data available event, size: ${event.data.size} bytes`);
                         audioChunks.push(event.data);
                     });
                     
                     // Handle recording stop event
                     mediaRecorder.addEventListener("stop", () => {
-                        // Create blob and URL
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        
-                        // Set up audio player
-                        audioPlayer.src = audioUrl;
-                        audioPlayerContainer.style.display = 'block';
-                        
-                        // Create a FormData object to send the recording
-                        const reader = new FileReader();
-                        reader.readAsDataURL(audioBlob);
-                        reader.onloadend = function() {
-                            // Store the base64 encoded audio in the hidden input
-                            audioBlobInput.value = reader.result;
+                        try {
+                            // Create blob with the selected mime type
+                            const audioBlob = new Blob(audioChunks, { type: selectedMimeType || 'audio/webm' });
+                            const fileSizeMB = (audioBlob.size / (1024 * 1024)).toFixed(2);
+                            logDebug(`Recording complete. File size: ${fileSizeMB} MB, Type: ${audioBlob.type}`);
+                            
+                            // Update file size info
+                            if (fileSizeInfo) {
+                                fileSizeInfo.textContent = `Inspelad fil: ${fileSizeMB} MB`;
+                                
+                                // Add warning if file is large
+                                if (audioBlob.size > 50 * 1024 * 1024) {
+                                    fileSizeInfo.innerHTML += ' <span class="text-warning">(Stor fil - kan ta längre tid att bearbeta)</span>';
+                                }
+                            }
+                            
+                            // Show warning if file might be too large
+                            if (audioBlob.size > 95 * 1024 * 1024) {
+                                alert(`Varning: Inspelningen är mycket stor (${fileSizeMB} MB) och kan överstiga filstorleksgränsen. Försök med en kortare inspelning eller använd filuppladdning för långa sessioner.`);
+                            }
+                            
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            
+                            // Set up audio player
+                            audioPlayer.src = audioUrl;
+                            audioPlayerContainer.style.display = 'block';
+                            
+                            // Use compressed format if possible for upload
+                            const compressBlob = async (blob) => {
+                                try {
+                                    logDebug('Starting blob compression');
+                                    
+                                    // Read the blob as an ArrayBuffer
+                                    const arrayBuffer = await blob.arrayBuffer();
+                                    
+                                    // Create an audio context
+                                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                                    
+                                    // Decode the audio
+                                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                                    
+                                    // Get the PCM data
+                                    const numberOfChannels = audioBuffer.numberOfChannels;
+                                    const length = audioBuffer.length;
+                                    const sampleRate = audioBuffer.sampleRate;
+                                    
+                                    // Create a mono audio buffer at 16kHz
+                                    const targetSampleRate = 16000;
+                                    const targetLength = Math.floor(length * targetSampleRate / sampleRate);
+                                    const offlineCtx = new OfflineAudioContext(1, targetLength, targetSampleRate);
+                                    
+                                    // Create a buffer source
+                                    const source = offlineCtx.createBufferSource();
+                                    source.buffer = audioBuffer;
+                                    source.connect(offlineCtx.destination);
+                                    source.start();
+                                    
+                                    // Render the audio
+                                    const renderedBuffer = await offlineCtx.startRendering();
+                                    
+                                    // Convert to WAV
+                                    const wavBlob = bufferToWav(renderedBuffer, 16);
+                                    logDebug(`Compressed blob size: ${(wavBlob.size / (1024 * 1024)).toFixed(2)} MB`);
+                                    
+                                    return wavBlob;
+                                } catch (err) {
+                                    logDebug('Error compressing blob:', err);
+                                    return blob; // Return original blob on error
+                                }
+                            };
+                            
+                            // Convert AudioBuffer to WAV Blob
+                            function bufferToWav(buffer, bitDepth) {
+                                const numChannels = buffer.numberOfChannels;
+                                const sampleRate = buffer.sampleRate;
+                                const numSamples = buffer.length;
+                                
+                                // Calculate bytes per sample
+                                const bytesPerSample = bitDepth / 8;
+                                const blockAlign = numChannels * bytesPerSample;
+                                const byteRate = sampleRate * blockAlign;
+                                const dataSize = numSamples * blockAlign;
+                                
+                                const arrayBuffer = new ArrayBuffer(44 + dataSize);
+                                const view = new DataView(arrayBuffer);
+                                
+                                // WAV header
+                                writeString(view, 0, 'RIFF');
+                                view.setUint32(4, 36 + dataSize, true);
+                                writeString(view, 8, 'WAVE');
+                                writeString(view, 12, 'fmt ');
+                                view.setUint32(16, 16, true);
+                                view.setUint16(20, 1, true); // PCM format
+                                view.setUint16(22, numChannels, true);
+                                view.setUint32(24, sampleRate, true);
+                                view.setUint32(28, byteRate, true);
+                                view.setUint16(32, blockAlign, true);
+                                view.setUint16(34, bitDepth, true);
+                                writeString(view, 36, 'data');
+                                view.setUint32(40, dataSize, true);
+                                
+                                // Write the PCM samples
+                                const channelData = [];
+                                for (let channel = 0; channel < numChannels; channel++) {
+                                    channelData.push(buffer.getChannelData(channel));
+                                }
+                                
+                                let offset = 44;
+                                for (let i = 0; i < numSamples; i++) {
+                                    for (let channel = 0; channel < numChannels; channel++) {
+                                        const sample = Math.max(-1, Math.min(1, channelData[channel][i]));
+                                        if (bitDepth === 16) {
+                                            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                                        } else {
+                                            throw new Error('Only 16-bit is supported');
+                                        }
+                                        offset += bytesPerSample;
+                                    }
+                                }
+                                
+                                return new Blob([view], { type: 'audio/wav' });
+                            }
+                            
+                            function writeString(view, offset, string) {
+                                for (let i = 0; i < string.length; i++) {
+                                    view.setUint8(offset + i, string.charCodeAt(i));
+                                }
+                            }
+                            
+                            // First try to compress the blob
+                            compressBlob(audioBlob).then(processedBlob => {
+                                logDebug(`Processed blob size: ${(processedBlob.size / (1024 * 1024)).toFixed(2)} MB`);
+                                
+                                // Read as data URL (base64)
+                                const reader = new FileReader();
+                                reader.onloadstart = () => logDebug('Started reading audio blob');
+                                reader.onerror = err => console.error('Error reading audio blob:', err);
+                                
+                                reader.onloadend = function() {
+                                    logDebug(`Finished reading audio blob, data URL length: ${reader.result.length}`);
+                                    // Store the base64 encoded audio in the hidden input
+                                    audioBlobInput.value = reader.result;
+                                    
+                                    // Show transcribe button
+                                    transcribeButton.style.display = 'inline-block';
+                                };
+                                
+                                reader.readAsDataURL(processedBlob);
+                            });
+                            
+                        } catch (error) {
+                            console.error('Error processing recorded audio:', error);
+                            alert(`Ett fel uppstod när inspelningen skulle bearbetas: ${error.message}`);
                         }
-                        
-                        // Show transcribe button
-                        transcribeButton.style.display = 'inline-block';
                     });
                 })
                 .catch(error => {
@@ -267,13 +494,18 @@
         
         function stopRecording() {
             // Stop media recorder
-            mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                logDebug('MediaRecorder stopped');
+            }
             
             // Stop timer
             clearInterval(timerInterval);
             
             // Stop all tracks in the stream
-            audioStream.getTracks().forEach(track => track.stop());
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+            }
             
             // Update UI
             recordButton.innerHTML = '<i class="fas fa-microphone"></i>';
@@ -323,57 +555,170 @@
             draw();
         }
         
-        // Form submission handlers
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                const spinner = this.querySelector('.processing-spinner');
-                const submitButton = this.querySelector('button[type="submit"]');
-                
-                spinner.style.display = 'inline-block';
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Bearbetar...';
-            });
-        });
-        
+        // === File Upload functionality ===
+        const browseButton = document.getElementById('browse-button');
         const fileInput = document.getElementById('audio-upload');
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                // Find the upload container but KEEP the file input
-                const uploadContainer = document.querySelector('.upload-container');
-                
-                // Create a new div for the preview but don't replace the whole container
-                const previewDiv = document.createElement('div');
-                previewDiv.className = 'mb-3';
-                previewDiv.innerHTML = `
-                    <i class="fas fa-file-audio fa-3x text-primary mb-3"></i>
-                    <h5>${file.name}</h5>
-                    <p class="text-muted">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                    <audio controls src="${URL.createObjectURL(file)}" style="width: 100%; margin-top: 10px;"></audio>
-                `;
-                
-                // Clear previous previews
-                const existingPreviews = uploadContainer.querySelectorAll('.mb-3:not(:first-child)');
-                existingPreviews.forEach(preview => preview.remove());
-                
-                // Add the preview after the existing content
-                uploadContainer.appendChild(previewDiv);
-            }
-        });
-         // Add event listener to upload form
-         const uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', function(e) {
-                const fileInput = document.getElementById('audio-upload');
-                if (fileInput && fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    console.log(`Submitting form with file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
-                } else {
-                    console.warn('Form submitted without file');
-                }
-                // Don't prevent form submission
+        const dragArea = document.getElementById('drag-area');
+        const uploadFileInfo = document.getElementById('upload-file-info');
+        
+        if (browseButton && fileInput) {
+            browseButton.addEventListener('click', () => {
+                fileInput.click();
             });
         }
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    displayFileInfo(file);
+                }
+            });
+        }
+        
+        // Drag and drop functionality
+        if (dragArea) {
+            ['dragover', 'dragenter'].forEach(eventName => {
+                dragArea.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dragArea.classList.add('active');
+                });
+            });
+            
+            ['dragleave', 'dragend'].forEach(eventName => {
+                dragArea.addEventListener(eventName, () => {
+                    dragArea.classList.remove('active');
+                });
+            });
+            
+            dragArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragArea.classList.remove('active');
+                
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    fileInput.files = e.dataTransfer.files;
+                    displayFileInfo(file);
+                }
+            });
+        }
+        
+        function displayFileInfo(file) {
+            logDebug(`File selected: ${file.name}, Size: ${(file.size/1024/1024).toFixed(2)}MB, Type: ${file.type}`);
+            
+            if (uploadFileInfo) {
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                uploadFileInfo.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-file-audio me-2"></i>
+                        <strong>${file.name}</strong> (${fileSizeMB} MB)
+                        <button type="button" class="btn-close float-end" onclick="clearFileSelection()"></button>
+                    </div>
+                `;
+                
+                // Add warning if file is large
+                if (file.size > 50 * 1024 * 1024) {
+                    uploadFileInfo.innerHTML += `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Denna fil är stor och kan ta längre tid att bearbeta.
+                        </div>
+                    `;
+                }
+                
+                // Validate file type
+                const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/webm', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'];
+                let fileExtension = file.name.split('.').pop().toLowerCase();
+                
+                if (!validTypes.includes(file.type) && 
+                    !['wav', 'mp3', 'ogg', 'm4a', 'webm'].includes(fileExtension)) {
+                    uploadFileInfo.innerHTML += `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle me-2"></i>
+                            Varning: Filformatet kanske inte stöds. Använd WAV, MP3, OGG eller M4A för bästa resultat.
+                        </div>
+                    `;
+                }
+            }
+            
+            // Change text in drag area to show file is selected
+            if (dragArea) {
+                dragArea.querySelector('h5').textContent = 'Fil vald';
+                dragArea.querySelector('p').textContent = 'Klicka på "Transkribera fil" för att fortsätta';
+            }
+        }
+        
+        window.clearFileSelection = function() {
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
+            if (uploadFileInfo) {
+                uploadFileInfo.innerHTML = '';
+            }
+            
+            if (dragArea) {
+                dragArea.querySelector('h5').textContent = 'Dra och släpp ljudfil här';
+                dragArea.querySelector('p').textContent = 'eller';
+            }
+        };
+        
+        // === Form submission handlers ===
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                logDebug(`Form submitted: ${this.id}`);
+                
+                // If this is the upload form, validate file was selected
+                if (this.id === 'upload-form') {
+                    if (fileInput && (!fileInput.files || fileInput.files.length === 0)) {
+                        e.preventDefault();
+                        alert('Vänligen välj en ljudfil först.');
+                        return;
+                    }
+                }
+                
+                // If this is the recording form, validate audio data exists
+                if (this.id === 'recording-form') {
+                    if (!audioBlobInput || !audioBlobInput.value) {
+                        e.preventDefault();
+                        alert('Ingen inspelning hittades. Vänligen spela in ljud först.');
+                        return;
+                    }
+                }
+                
+                // Show spinner
+                const spinner = this.querySelector('.processing-spinner');
+                if (spinner) {
+                    spinner.style.display = 'inline-block';
+                }
+                
+                // Disable submit button
+                const submitButton = this.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Bearbetar...';
+                }
+                
+                // Log form data if in debug mode
+                if (DEBUG) {
+                    const formData = new FormData(this);
+                    let logData = {};
+                    
+                    for (let [key, value] of formData.entries()) {
+                        if (key === 'audio-blob') {
+                            logData[key] = value ? `[Base64 data, length: ${value.length}]` : 'empty';
+                        } else if (key === 'audio') {
+                            logData[key] = value.name ? `File: ${value.name}` : 'No file';
+                        } else {
+                            logData[key] = value;
+                        }
+                    }
+                    
+                    logDebug('Form data:', logData);
+                }
+            });
+        });
     });
 </script>
 {% endblock %}

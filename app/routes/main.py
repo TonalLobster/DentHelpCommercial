@@ -3,12 +3,15 @@ Main routes for the DentalScribe application.
 """
 import os
 import json
+import base64
 import tempfile
 import datetime
+from io import BytesIO
 from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
+from app.forms import TranscriptionForm  # Import your form
 from app.services.audio_processor import process_audio
 from app.services.transcription_service import transcribe_audio
 from app.services.summary_service import generate_summary
@@ -35,63 +38,107 @@ def dashboard():
     transcriptions = Transcription.query.filter_by(user_id=current_user.id).order_by(Transcription.created_at.desc()).all()
     return render_template('main/dashboard.html', transcriptions=transcriptions)
 
+# Update this part of your transcribe route in app/routes/main.py
+
 @main.route('/transcribe', methods=['GET', 'POST'])
 @login_required
 def transcribe():
     """Page for creating new transcriptions."""
-    # Create a simple form for CSRF protection
+    # Create form for CSRF protection
     form = FlaskForm()
     
     if request.method == 'POST':
-        # Add these debugging lines
         current_app.logger.info("POST request received for transcription")
+        current_app.logger.info(f"Form data keys: {list(request.form.keys())}")
         current_app.logger.info(f"Files in request: {list(request.files.keys())}")
-        current_app.logger.info(f"Form data: {list(request.form.keys())}")
-        current_app.logger.info(f"Content type: {request.headers.get('Content-Type', 'Not provided')}")
         
-        # Check if the post request has the file part
-        if 'audio' not in request.files:
-            current_app.logger.warning("No file in request")
-            flash('No file part', 'error')
-            return redirect(request.url)
-        
-        file = request.files['audio']
-        current_app.logger.info(f"Fil mottagen: {file.filename}")
-        
-        # If user does not select file, browser also submit an empty part without filename
-        if file.filename == '':
-            current_app.logger.warning("Filnamn är tomt")
-            flash('Ingen fil vald', 'error')
-            return redirect(request.url)
-        
-        if file and allowed_file(file.filename):
+        # Case 1: Audio recording from browser (as base64 data)
+        if 'audio-blob' in request.form and request.form['audio-blob']:
+            current_app.logger.info("Processing recorded audio (base64 data)")
             try:
-                current_app.logger.info("Börjar bearbeta ljudfil...")
+                # Extract the actual base64 content after the data URL header
+                audio_data = request.form['audio-blob']
+                if ',' in audio_data:
+                    header, encoded = audio_data.split(",", 1)
+                    current_app.logger.info(f"Audio data format: {header}")
+                else:
+                    encoded = audio_data
                 
-                # Process the audio file
-                processed_audio, processing_error = process_audio(file)
+                # Get file size estimate
+                estimated_size_kb = len(encoded) * 3 / 4 / 1024  # base64 encoding adds ~33% overhead
+                current_app.logger.info(f"Estimated decoded size: {estimated_size_kb:.2f} KB")
                 
-                if processing_error:
-                    current_app.logger.warning(f"Varning vid ljudbearbetning: {processing_error}")
-                    flash(f'Varning vid ljudbearbetning: {processing_error}', 'warning')
-                    # Continue anyway
+                if estimated_size_kb > 100 * 1024:  # > 100MB
+                    flash('Inspelningen är för stor. Maximal filstorlek är 100MB.', 'error')
+                    return redirect(request.url)
                 
-                # Transcribe the audio
-                current_app.logger.info("Startar transkribering med OpenAI...")
-                transcription_text = transcribe_audio(processed_audio)
-                current_app.logger.info(f"Transkription slutförd, längd: {len(transcription_text)} tecken")
+                # Decode the base64 data to binary
+                try:
+                    audio_bytes = base64.b64decode(encoded)
+                    current_app.logger.info(f"Successfully decoded base64 data, size: {len(audio_bytes) // 1024} KB")
+                except Exception as e:
+                    current_app.logger.error(f"Error decoding base64: {str(e)}")
+                    flash('Kunde inte avkoda ljuddata. Försök igen eller ladda upp en fil.', 'error')
+                    return redirect(request.url)
+                
+                # Save to temporary file
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
+                temp_file.write(audio_bytes)
+                temp_file.close()
+                current_app.logger.info(f"Saved temporary file: {temp_file.name}, size: {os.path.getsize(temp_file.name) // 1024} KB")
+                
+                # Process the audio from the file
+                try:
+                    with open(temp_file.name, 'rb') as f:
+                        file_like = BytesIO(f.read())
+                        file_like.name = os.path.basename(temp_file.name)
+                        
+                        processed_audio, processing_error = process_audio(file_like)
+                        
+                        if processing_error:
+                            current_app.logger.warning(f"Audio processing warning: {processing_error}")
+                            flash(f'Varning vid ljudbearbetning: {processing_error}', 'warning')
+                except Exception as e:
+                    current_app.logger.error(f"Error processing audio: {str(e)}")
+                    flash(f'Fel vid ljudbearbetning: {str(e)}', 'error')
+                    # Try to continue with original file
+                    with open(temp_file.name, 'rb') as f:
+                        processed_audio = BytesIO(f.read())
+                        processed_audio.name = os.path.basename(temp_file.name)
+                
+                # Continue with transcription
+                try:
+                    current_app.logger.info("Starting transcription")
+                    transcription_text = transcribe_audio(processed_audio)
+                    current_app.logger.info(f"Transcription complete, length: {len(transcription_text)} characters")
+                except Exception as e:
+                    current_app.logger.error(f"Transcription error: {str(e)}")
+                    flash(f'Fel vid transkribering: {str(e)}', 'error')
+                    
+                    # Clean up temporary file
+                    try:
+                        os.unlink(temp_file.name)
+                    except:
+                        pass
+                        
+                    return redirect(request.url)
                 
                 # Generate summary
-                current_app.logger.info("Genererar sammanfattning...")
-                summary_dict = generate_summary(transcription_text)
-                current_app.logger.info("Sammanfattning genererad")
+                try:
+                    current_app.logger.info("Generating summary")
+                    summary_dict = generate_summary(transcription_text)
+                    current_app.logger.info("Summary generated")
+                except Exception as e:
+                    current_app.logger.error(f"Summary generation error: {str(e)}")
+                    flash(f'Fel vid sammanfattningsgenerering: {str(e)}', 'error')
+                    summary_dict = {"error": f"Kunde inte generera sammanfattning: {str(e)}"}
                 
                 # Create new transcription record
-                title = request.form.get('title')
+                title = request.form.get('recording-title')
                 if not title or title.strip() == '':
-                    title = 'Transkription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-                    
-                current_app.logger.info(f"Skapar transkriptionspost med titel: {title}")
+                    title = 'Inspelning ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                
+                current_app.logger.info(f"Creating transcription with title: {title}")
                 new_transcription = Transcription(
                     title=title,
                     user_id=current_user.id,
@@ -100,33 +147,102 @@ def transcribe():
                 )
                 
                 # Save to database
-                current_app.logger.info("Sparar till databas...")
                 db.session.add(new_transcription)
                 db.session.commit()
-                current_app.logger.info(f"Transkription sparad med ID: {new_transcription.id}")
+                current_app.logger.info(f"Transcription saved with ID: {new_transcription.id}")
+                
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_file.name)
+                except:
+                    pass
                 
                 flash('Transkription skapad framgångsrikt!', 'success')
                 return redirect(url_for('main.view_transcription', id=new_transcription.id))
-                
-            except ValueError as ve:
-                current_app.logger.error(f"Valideringsfel: {str(ve)}")
-                flash(f'Valideringsfel: {str(ve)}', 'error')
-                return redirect(request.url)
-                
-            except RuntimeError as re:
-                current_app.logger.error(f"Körningsfel: {str(re)}")
-                flash(f'Körningsfel: {str(re)}', 'error')
-                return redirect(request.url)
-                
+            
             except Exception as e:
-                current_app.logger.error(f"Oväntat fel vid transkribering: {str(e)}", exc_info=True)
+                current_app.logger.error(f"Unexpected error with recorded audio: {str(e)}", exc_info=True)
                 flash(f'Ett oväntat fel inträffade: {str(e)}', 'error')
                 return redirect(request.url)
+        
+        # Case 2: File upload
+        elif 'audio' in request.files:
+            file = request.files['audio']
+            current_app.logger.info(f"Received file: {file.filename}")
+            
+            # Check if file was actually selected
+            if file.filename == '':
+                current_app.logger.warning("Empty filename")
+                flash('Ingen fil vald', 'error')
+                return redirect(request.url)
+            
+            # Check file size before processing
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)  # Reset file pointer
+            
+            current_app.logger.info(f"File size: {file_size // 1024} KB")
+            
+            if file_size > 100 * 1024 * 1024:  # 100MB limit
+                flash('Filen är för stor. Maximal filstorlek är 100MB.', 'error')
+                return redirect(request.url)
+            
+            # Check if file type is allowed
+            allowed_extensions = {'wav', 'mp3', 'ogg', 'm4a', 'webm'}
+            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+                flash('Filtypen är inte tillåten. Vänligen ladda upp WAV, MP3, OGG, M4A eller WEBM.', 'error')
+                return redirect(request.url)
+            
+            try:
+                # Process the audio file
+                current_app.logger.info("Processing audio file")
+                processed_audio, processing_error = process_audio(file)
+                
+                if processing_error:
+                    current_app.logger.warning(f"Audio processing warning: {processing_error}")
+                    flash(f'Varning vid ljudbearbetning: {processing_error}', 'warning')
+                
+                # Transcribe the audio
+                current_app.logger.info("Starting transcription")
+                transcription_text = transcribe_audio(processed_audio)
+                current_app.logger.info(f"Transcription complete, length: {len(transcription_text)} characters")
+                
+                # Generate summary
+                current_app.logger.info("Generating summary")
+                summary_dict = generate_summary(transcription_text)
+                current_app.logger.info("Summary generated")
+                
+                # Create new transcription record
+                title = request.form.get('title')
+                if not title or title.strip() == '':
+                    title = 'Uppladdning ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                
+                current_app.logger.info(f"Creating transcription with title: {title}")
+                new_transcription = Transcription(
+                    title=title,
+                    user_id=current_user.id,
+                    transcription_text=transcription_text,
+                    summary=json.dumps(summary_dict, ensure_ascii=False)
+                )
+                
+                # Save to database
+                db.session.add(new_transcription)
+                db.session.commit()
+                current_app.logger.info(f"Transcription saved with ID: {new_transcription.id}")
+                
+                flash('Transkription skapad framgångsrikt!', 'success')
+                return redirect(url_for('main.view_transcription', id=new_transcription.id))
+            
+            except Exception as e:
+                current_app.logger.error(f"Error during file upload processing: {str(e)}", exc_info=True)
+                flash(f'Ett fel inträffade: {str(e)}', 'error')
+                return redirect(request.url)
+        
         else:
-            current_app.logger.warning(f"Otillåten filtyp: {file.filename}")
-            flash('Filtypen är inte tillåten. Vänligen ladda upp WAV, MP3, M4A eller OGG.', 'error')
+            flash('Ingen ljudfil eller inspelning hittades i förfrågan', 'error')
             return redirect(request.url)
     
+    # GET request - display the form
     return render_template('main/transcribe.html', form=form)
 
 @main.route('/transcriptions/<int:id>')
