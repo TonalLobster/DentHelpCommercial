@@ -94,30 +94,146 @@
         </div>
     </div>
 </div>
-    
-    <!-- Action buttons -->
-    <div class="action-buttons">
+
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs mb-4" id="transcriptionTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">
+                    <i class="fas fa-clipboard-list me-1"></i> Sammanfattning
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="transcript-tab" data-bs-toggle="tab" data-bs-target="#transcript" type="button" role="tab">
+                    <i class="fas fa-file-alt me-1"></i> Fullständig Transkription
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-view" type="button" role="tab">
+                    <i class="fas fa-code me-1"></i> JSON
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content" id="transcriptionTabContent">
+    <!-- Summary Tab -->
+    <div class="tab-pane fade show active" id="summary" role="tabpanel">
         <div class="row">
             <div class="col-md-6">
-                <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-1"></i>Tillbaka till Dashboard
-                </a>
-            </div>
-            <div class="col-md-6 text-end">
-                <div class="btn-group">
-                    <a href="#" class="btn btn-success" id="export-button">
-                        <i class="fas fa-file-export me-1"></i>Exportera
-                    </a>
-                    <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="visually-hidden">Toggle Dropdown</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" id="export-pdf">PDF-format</a></li>
-                        <li><a class="dropdown-item" href="#" id="export-word">Word-format</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" id="export-json">JSON-format</a></li>
-                    </ul>
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-notes-medical"></i></div>
+                        <div class="title">Anamnes</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.anamnes }}</p>
+                    </div>
                 </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-search"></i></div>
+                        <div class="title">Status</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.status|safe }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-stethoscope"></i></div>
+                        <div class="title">Diagnos</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.diagnos }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-procedures"></i></div>
+                        <div class="title">Åtgärd</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.åtgärd }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-calendar-alt"></i></div>
+                        <div class="title">Behandlingsplan</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.behandlingsplan }}</p>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="card-header">
+                        <div class="icon"><i class="fas fa-comments"></i></div>
+                        <div class="title">Kommunikation</div>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ summary.kommunikation }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Transcript Tab -->
+    <div class="tab-pane fade" id="transcript" role="tabpanel">
+        <div class="transcription-container shadow-sm">
+            {{ transcription.transcription_text }}
+        </div>
+    </div>
+    
+    <!-- JSON Tab -->
+    <div class="tab-pane fade" id="json-view" role="tabpanel">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-code me-2"></i>JSON Data</span>
+                    <button class="btn btn-sm btn-primary" id="copy-json">
+                        <i class="fas fa-copy me-1"></i>Kopiera
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre id="json-content">{{ summary|tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action buttons -->
+<div class="action-buttons">
+    <div class="row">
+        <div class="col-md-6">
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Tillbaka till Dashboard
+            </a>
+        </div>
+        <div class="col-md-6 text-end">
+            <div class="btn-group">
+                <a href="#" class="btn btn-success" id="export-button">
+                    <i class="fas fa-file-export me-1"></i>Exportera
+                </a>
+                <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" id="export-pdf">PDF-format</a></li>
+                    <li><a class="dropdown-item" href="#" id="export-word">Word-format</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" id="export-json">JSON-format</a></li>
+                </ul>
             </div>
         </div>
     </div>
@@ -131,52 +247,84 @@
         const copyJsonBtn = document.getElementById('copy-json');
         const jsonContent = document.getElementById('json-content');
         
-        copyJsonBtn.addEventListener('click', function() {
-            const copyText = jsonContent.textContent;
-            navigator.clipboard.writeText(copyText).then(function() {
-                // Change button text temporarily
-                const originalText = copyJsonBtn.innerHTML;
-                copyJsonBtn.innerHTML = '<i class="fas fa-check me-1"></i>Kopierat!';
-                
-                setTimeout(function() {
-                    copyJsonBtn.innerHTML = originalText;
-                }, 2000);
-            }, function() {
-                alert('Kunde inte kopiera texten till urklipp. Försök igen.');
+        if(copyJsonBtn && jsonContent) {
+            copyJsonBtn.addEventListener('click', function() {
+                const copyText = jsonContent.textContent;
+                navigator.clipboard.writeText(copyText).then(function() {
+                    // Change button text temporarily
+                    const originalText = copyJsonBtn.innerHTML;
+                    copyJsonBtn.innerHTML = '<i class="fas fa-check me-1"></i>Kopierat!';
+                    
+                    setTimeout(function() {
+                        copyJsonBtn.innerHTML = originalText;
+                    }, 2000);
+                }, function() {
+                    alert('Kunde inte kopiera texten till urklipp. Försök igen.');
+                });
             });
-        });
+        }
         
         // Export functionality
-        document.getElementById('export-button').addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('export-pdf').click();
-        });
+        const exportButton = document.getElementById('export-button');
+        const exportPdf = document.getElementById('export-pdf');
+        const exportWord = document.getElementById('export-word');
+        const exportJson = document.getElementById('export-json');
         
-        document.getElementById('export-pdf').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('PDF-export kommer i nästa version');
-        });
+        if(exportButton) {
+            exportButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                if(exportPdf) {
+                    exportPdf.click();
+                }
+            });
+        }
         
-        document.getElementById('export-word').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Word-export kommer i nästa version');
-        });
+        if(exportPdf) {
+            exportPdf.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('PDF-export kommer i nästa version');
+            });
+        }
         
-        document.getElementById('export-json').addEventListener('click', function(e) {
-            e.preventDefault();
-            // Create and download a JSON file
-            const data = JSON.parse(jsonContent.textContent);
-            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = '{{ transcription.title }}.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
+        if(exportWord) {
+            exportWord.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('Word-export kommer i nästa version');
+            });
+        }
+        
+        if(exportJson && jsonContent) {
+            exportJson.addEventListener('click', function(e) {
+                e.preventDefault();
+                try {
+                    // Get the summary data
+                    const data = JSON.parse(jsonContent.textContent);
+                    
+                    // Create the export object
+                    const exportData = {
+                        title: "{{ transcription.title }}",
+                        created_at: "{{ transcription.created_at.strftime('%Y-%m-%d %H:%M') }}",
+                        transcription_text: "{{ transcription.transcription_text | replace('\n', '\\n') | replace('\"', '\\\"') }}",
+                        summary: data
+                    };
+                    
+                    // Create a blob and download
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = '{{ transcription.title }}.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch(error) {
+                    console.error('Error exporting JSON:', error);
+                    alert('Ett fel uppstod vid export av JSON. Se konsolen för detaljer.');
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

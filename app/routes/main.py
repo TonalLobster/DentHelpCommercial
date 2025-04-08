@@ -44,12 +44,16 @@ def transcribe():
     form = FlaskForm()
     
     if request.method == 'POST':
-        current_app.logger.info("POST-förfrågan mottagen för transkribering")
+        # Add these debugging lines
+        current_app.logger.info("POST request received for transcription")
+        current_app.logger.info(f"Files in request: {list(request.files.keys())}")
+        current_app.logger.info(f"Form data: {list(request.form.keys())}")
+        current_app.logger.info(f"Content type: {request.headers.get('Content-Type', 'Not provided')}")
         
         # Check if the post request has the file part
         if 'audio' not in request.files:
-            current_app.logger.warning("Ingen fil i förfrågan")
-            flash('Ingen fil hittades i förfrågan', 'error')
+            current_app.logger.warning("No file in request")
+            flash('No file part', 'error')
             return redirect(request.url)
         
         file = request.files['audio']

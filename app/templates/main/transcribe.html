@@ -150,7 +150,7 @@
                                     <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                                     <h5>Dra och släpp ljudfil här</h5>
                                     <p class="text-muted">eller</p>
-                                    <input type="file" class="form-control" id="audio-upload" name="audio" accept="audio/wav,audio/mp3,audio/x-m4a,audio/ogg">
+                                    <input type="file" name="audio" id="audio-upload">
                                     <div class="form-text">Tillåtna format: WAV, MP3, M4A, OGG (max 100MB)</div>
                                 </div>
                             </div>
@@ -340,17 +340,41 @@
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Find the upload container but KEEP the file input
                 const uploadContainer = document.querySelector('.upload-container');
-                uploadContainer.innerHTML = `
-                    <div class="mb-3">
-                        <i class="fas fa-file-audio fa-3x text-primary mb-3"></i>
-                        <h5>${file.name}</h5>
-                        <p class="text-muted">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                        <audio controls src="${URL.createObjectURL(file)}" style="width: 100%; margin-top: 10px;"></audio>
-                    </div>
+                
+                // Create a new div for the preview but don't replace the whole container
+                const previewDiv = document.createElement('div');
+                previewDiv.className = 'mb-3';
+                previewDiv.innerHTML = `
+                    <i class="fas fa-file-audio fa-3x text-primary mb-3"></i>
+                    <h5>${file.name}</h5>
+                    <p class="text-muted">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                    <audio controls src="${URL.createObjectURL(file)}" style="width: 100%; margin-top: 10px;"></audio>
                 `;
+                
+                // Clear previous previews
+                const existingPreviews = uploadContainer.querySelectorAll('.mb-3:not(:first-child)');
+                existingPreviews.forEach(preview => preview.remove());
+                
+                // Add the preview after the existing content
+                uploadContainer.appendChild(previewDiv);
             }
         });
+         // Add event listener to upload form
+         const uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                const fileInput = document.getElementById('audio-upload');
+                if (fileInput && fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    console.log(`Submitting form with file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
+                } else {
+                    console.warn('Form submitted without file');
+                }
+                // Don't prevent form submission
+            });
+        }
     });
 </script>
 {% endblock %}

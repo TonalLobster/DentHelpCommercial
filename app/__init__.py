@@ -52,6 +52,7 @@ def create_app():
         OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY'),
         VALID_LICENSES=os.environ.get('VALID_LICENSES', '').split(',')
     )
+    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
     
     # Initialize extensions with the app
     db.init_app(app)
