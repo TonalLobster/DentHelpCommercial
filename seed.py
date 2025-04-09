@@ -26,10 +26,10 @@ def seed_db():
     if not admin:
         admin = User(
             username='admin',
-            email='admin@dentalscribe.ai',
+            email='support@denthelp.se',
             license_number='ADMIN001'
         )
-        admin.set_password('admin123')
+        admin.set_password('Bifrost431!')
         db.session.add(admin)
     
     # Sample dentist
