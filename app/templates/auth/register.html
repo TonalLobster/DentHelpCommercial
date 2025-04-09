@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Registrera konto | DentalScribe AI{% endblock %}
+{% block title %}Registrera konto | DentHelp AI{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -52,6 +52,8 @@
     .requirements {
         font-size: 0.875rem;
         color: #6c757d;
+        margin-top: 0.5rem;
+        margin-bottom: 1rem;
     }
     
     .requirements ul {
@@ -77,6 +79,21 @@
     .password-strength-text {
         font-size: 0.75rem;
         margin-top: 0.25rem;
+    }
+    
+    .password-requirement {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.25rem;
+    }
+    
+    .password-requirement i {
+        margin-right: 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .text-success {
+        color: #198754 !important;
     }
 </style>
 {% endblock %}
@@ -133,7 +150,7 @@
                 </div>
                 
                 <div class="form-floating">
-                    {{ form.password(class="form-control", placeholder="Lösenord") }}
+                    {{ form.password(class="form-control", placeholder="Lösenord", id="password") }}
                     <label for="{{ form.password.id }}">Lösenord</label>
                     {% if form.password.errors %}
                         <div class="text-danger">
@@ -144,7 +161,34 @@
                     {% endif %}
                 </div>
                 
-                <div class="form-floating">
+                <!-- Lösenordskrav sektion -->
+                <div class="requirements">
+                    <p class="mb-1">Lösenordet måste uppfylla följande krav:</p>
+                    <ul>
+                        <li id="length" class="password-requirement">
+                            <i class="fas fa-circle"></i> Minst 8 tecken
+                        </li>
+                        <li id="capital" class="password-requirement">
+                            <i class="fas fa-circle"></i> Minst en stor bokstav (A-Ö)
+                        </li>
+                        <li id="number" class="password-requirement">
+                            <i class="fas fa-circle"></i> Minst en siffra (0-9)
+                        </li>
+                        <li id="special" class="password-requirement">
+                            <i class="fas fa-circle"></i> Minst ett specialtecken (!@#$%^&*)
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Lösenordsstyrkeindikator -->
+                <div class="password-strength">
+                    <div id="password-strength-bar" class="password-strength-bar"></div>
+                </div>
+                <div class="text-end">
+                    <small id="password-strength-text" class="password-strength-text">Inte angivet</small>
+                </div>
+                
+                <div class="form-floating mt-3">
                     {{ form.password_confirm(class="form-control", placeholder="Bekräfta lösenord") }}
                     <label for="{{ form.password_confirm.id }}">Bekräfta lösenord</label>
                     {% if form.password_confirm.errors %}
@@ -156,8 +200,8 @@
                     {% endif %}
                 </div>
                 
-                <div class="d-grid">
-                    {{ form.submit(class="btn btn-primary btn-lg") }}
+                <div class="d-grid mt-4">
+                    {{ form.submit(class="btn btn-primary btn-lg", id="register-button") }}
                 </div>
             </form>
             
@@ -179,8 +223,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const passwordInput = document.getElementById('password');
         const passwordConfirmInput = document.getElementById('password_confirm');
-        const agreeTerms = document.getElementById('agree_terms');
-        const registerButton = document.getElementById('register-button');
+        const registerButton = document.querySelector('input[type="submit"]');
         const strengthBar = document.getElementById('password-strength-bar');
         const strengthText = document.getElementById('password-strength-text');
         
@@ -195,36 +238,55 @@
             let strength = 0;
             let feedback = '';
             
+            // Nollställ alla ikoner först
+            [lengthReq, capitalReq, numberReq, specialReq].forEach(req => {
+                req.classList.remove('text-success');
+                const icon = req.querySelector('i');
+                icon.classList.remove('fa-check-circle');
+                icon.classList.add('fa-circle');
+            });
+            
+            // Om lösenordet är tomt
+            if (password.length === 0) {
+                strengthBar.style.width = '0%';
+                strengthText.textContent = 'Inte angivet';
+                return false;
+            }
+            
             // Check length
             if (password.length >= 8) {
                 strength += 25;
                 lengthReq.classList.add('text-success');
-            } else {
-                lengthReq.classList.remove('text-success');
+                const icon = lengthReq.querySelector('i');
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-check-circle');
             }
             
             // Check for uppercase letters
-            if (/[A-Z]/.test(password)) {
+            if (/[A-ZÅÄÖ]/.test(password)) {
                 strength += 25;
                 capitalReq.classList.add('text-success');
-            } else {
-                capitalReq.classList.remove('text-success');
+                const icon = capitalReq.querySelector('i');
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-check-circle');
             }
             
             // Check for numbers
             if (/[0-9]/.test(password)) {
                 strength += 25;
                 numberReq.classList.add('text-success');
-            } else {
-                numberReq.classList.remove('text-success');
+                const icon = numberReq.querySelector('i');
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-check-circle');
             }
             
             // Check for special characters
-            if (/[^A-Za-z0-9]/.test(password)) {
+            if (/[^A-Za-z0-9åäöÅÄÖ]/.test(password)) {
                 strength += 25;
                 specialReq.classList.add('text-success');
-            } else {
-                specialReq.classList.remove('text-success');
+                const icon = specialReq.querySelector('i');
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-check-circle');
             }
             
             // Update strength bar
@@ -262,14 +324,21 @@
         function checkFormValidity() {
             const isPasswordStrong = checkPasswordStrength(passwordInput.value);
             const doPasswordsMatch = passwordsMatch();
-            const hasAgreed = agreeTerms.checked;
             
             // Enable button only if all conditions are met
-            registerButton.disabled = !(isPasswordStrong && doPasswordsMatch && hasAgreed);
+            if (isPasswordStrong && doPasswordsMatch) {
+                registerButton.disabled = false;
+            } else {
+                registerButton.disabled = true;
+            }
         }
         
         // Add event listeners
-        passwordInput.addEventListener('input', checkFormValidity);
+        passwordInput.addEventListener('input', function() {
+            checkPasswordStrength(this.value);
+            checkFormValidity();
+        });
+        
         passwordConfirmInput.addEventListener('input', function() {
             if (passwordsMatch()) {
                 passwordConfirmInput.classList.remove('is-invalid');
@@ -280,7 +349,6 @@
             }
             checkFormValidity();
         });
-        agreeTerms.addEventListener('change', checkFormValidity);
         
         // Initial check
         checkPasswordStrength(passwordInput.value);
