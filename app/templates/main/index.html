@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}DentalScribe AI - Transkribera patientsamtal{% endblock %}
+{% block title %}DentHelp AI - Transkribera patientsamtal{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -85,7 +85,7 @@
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-lg-8">
-                <h1 class="hero-title">DentalScribe AI</h1>
+                <h1 class="hero-title">DentHelp AI</h1>
                 <p class="hero-subtitle">Effektiv transkribering och analys av patientsamtal för tandläkare</p>
                 <div class="d-flex justify-content-center gap-3">
                     {% if current_user.is_authenticated %}
@@ -148,7 +148,7 @@
         <h2 class="text-center mb-5">Hur det fungerar</h2>
         <div class="row align-items-center">
             <div class="col-md-6">
-                <img src="https://via.placeholder.com/600x400" alt="DentalScribe Demo" class="img-fluid rounded shadow">
+                <img src="https://via.placeholder.com/600x400" alt="DentHelp Demo" class="img-fluid rounded shadow">
             </div>
             <div class="col-md-6">
                 <div class="steps">
@@ -209,7 +209,7 @@
         <div class="row">
             <div class="col-md-6">
                 <div class="testimonial">
-                    <p>"DentalScribe har revolutionerat min dokumentationsprocess. Jag sparar minst 10 minuter per patient och får mer tid för faktisk tandvård."</p>
+                    <p>"DentHelp har revolutionerat min dokumentationsprocess. Jag sparar minst 10 minuter per patient och får mer tid för faktisk tandvård."</p>
                     <div class="testimonial-author">Anna Lindberg</div>
                     <div class="testimonial-role">Allmäntandläkare, Stockholm</div>
                 </div>
@@ -231,7 +231,7 @@
         <div class="row justify-content-center">
             <div class="col-lg-8">
                 <h2 class="cta-title">Modernisera din praktik idag</h2>
-                <p class="cta-text">Anslut dig till hundratals tandläkare som sparar tid och förbättrar sin dokumentationsprocess med DentalScribe AI.</p>
+                <p class="cta-text">Anslut dig till hundratals tandläkare som sparar tid och förbättrar sin dokumentationsprocess med DentHelp AI.</p>
                 {% if current_user.is_authenticated %}
                 <a href="{{ url_for('main.transcribe') }}" class="btn btn-primary btn-lg">Skapa din första transkription</a>
                 {% else %}
