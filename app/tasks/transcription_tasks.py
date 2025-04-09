@@ -1,108 +1,83 @@
 """
-Celery tasks for transcription and summarization processing.
+Celery tasks for audio transcription and summary generation.
 """
-import logging
-import json
-import tempfile
 import os
-import base64
-import datetime
+import json
+import logging
+import tempfile
+from datetime import datetime
 from io import BytesIO
-from celery import shared_task
-from flask import current_app
 
-# Configure logging
+# Import celery instance
+try:
+    from app.celery_worker import celery
+except ImportError:
+    # Fallback for testing or direct imports
+    from celery import Celery
+    celery = Celery('dental_scribe')
+
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, name='transcribe_audio')
-def transcribe_audio_task(self, audio_data, form_data, user_id):
+@celery.task(bind=True, name='app.tasks.process_transcription')
+def process_transcription(self, file_path, title, user_id, temp_file=True):
     """
-    Process an audio file asynchronously:
-    1. Process audio for optimal transcription
-    2. Transcribe audio to text
-    3. Generate summary
-    4. Save to database
+    Process an audio file: process, transcribe, and generate summary.
     
     Args:
-        audio_data: Base64 encoded audio data or file path
-        form_data: Dictionary with form data (title, etc.)
-        user_id: ID of the user who submitted the transcription
+        file_path (str): Path to the audio file or temp file ID
+        title (str): Title for the transcription
+        user_id (int): User ID of the owner
+        temp_file (bool): Whether file_path is a temporary file that should be deleted
         
     Returns:
-        dict: Result information including transcription ID
+        dict: Result containing transcription ID and status
     """
-    logger.info(f"Starting async transcription process for user {user_id}")
-    self.update_state(state='INITIALIZING', meta={'status': 'Starting process...'})
-    
     try:
-        # We need to import these here to avoid circular imports
-        from app import db
-        from app.models.transcription import Transcription
+        # Import these inside the task to avoid circular imports
         from app.services.audio_processor import process_audio
         from app.services.transcription_service import transcribe_audio
         from app.services.summary_service import generate_summary
+        from app.models.transcription import Transcription
+        from app import db
         
-        # Get title from form data
-        title = form_data.get('title')
-        if not title or title.strip() == '':
-            title = f'Transkription {datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}'
+        logger.info(f"Starting transcription task for file: {file_path}")
         
-        # Get patient ID if provided
-        patient_id = form_data.get('patient_id')
-            
-        # Process audio data
-        audio_file = None
-        temp_file_path = None
-        
-        self.update_state(state='PROCESSING', meta={'status': 'Processing audio...'})
-        logger.info("Processing audio data")
-        
-        # Handle different types of audio_data
-        if isinstance(audio_data, str):
-            if audio_data.startswith('data:'):
-                # Handle base64 encoded data
-                header, encoded = audio_data.split(",", 1)
-                audio_bytes = base64.b64decode(encoded)
-                audio_file = BytesIO(audio_bytes)
-                audio_file.name = "recorded_audio.webm"
-                logger.info("Decoded base64 audio data")
-            elif os.path.exists(audio_data):
-                # Handle file path
-                logger.info(f"Reading audio from file: {audio_data}")
-                temp_file_path = audio_data  # Remember to clean this up later
-                with open(audio_data, 'rb') as f:
-                    audio_file = BytesIO(f.read())
-                    audio_file.name = os.path.basename(audio_data)
-            else:
-                raise ValueError(f"Invalid audio data: {audio_data[:30]}...")
+        # Open the file for processing
+        if temp_file:
+            with open(file_path, 'rb') as f:
+                audio_data = BytesIO(f.read())
+                audio_data.name = os.path.basename(file_path)
         else:
-            # Handle binary data directly
-            audio_file = BytesIO(audio_data)
-            audio_file.name = "uploaded_audio.wav"
-            logger.info("Using raw binary audio data")
-        
-        # Process audio for better transcription
-        self.update_state(state='PROCESSING', meta={'status': 'Optimizing audio...'})
-        processed_audio, processing_error = process_audio(audio_file)
+            audio_data = file_path
+            
+        # Process the audio file for optimal transcription
+        logger.info("Processing audio file...")
+        self.update_state(state='PROCESSING_AUDIO', meta={'status': 'Processing audio'})
+        processed_audio, processing_error = process_audio(audio_data)
         
         if processing_error:
             logger.warning(f"Audio processing warning: {processing_error}")
+            # Continue anyway, but log the warning
         
-        # Transcribe audio
-        self.update_state(state='TRANSCRIBING', meta={'status': 'Transcribing audio...'})
-        logger.info("Starting transcription")
+        # Transcribe the audio
+        logger.info("Transcribing audio...")
+        self.update_state(state='TRANSCRIBING', meta={'status': 'Transcribing audio'})
         transcription_text = transcribe_audio(processed_audio)
         logger.info(f"Transcription completed, length: {len(transcription_text)} characters")
         
         # Generate summary
-        self.update_state(state='SUMMARIZING', meta={'status': 'Generating AI summary...'})
-        logger.info("Generating summary")
+        logger.info("Generating summary...")
+        self.update_state(state='GENERATING_SUMMARY', meta={'status': 'Generating summary'})
         summary_dict = generate_summary(transcription_text)
-        logger.info("Summary generation completed")
+        logger.info("Summary generated")
         
-        # Create and save transcription
-        self.update_state(state='SAVING', meta={'status': 'Saving results...'})
+        # Create title if not provided
+        if not title or title.strip() == '':
+            title = 'Transcription ' + datetime.now().strftime('%Y-%m-%d %H:%M')
+            
+        # Create new transcription record
         logger.info(f"Creating transcription record with title: {title}")
+        self.update_state(state='SAVING', meta={'status': 'Saving transcription'})
         
         new_transcription = Transcription(
             title=title,
@@ -111,36 +86,26 @@ def transcribe_audio_task(self, audio_data, form_data, user_id):
             summary=json.dumps(summary_dict, ensure_ascii=False)
         )
         
-        # Add patient ID if provided
-        if patient_id:
-            new_transcription.patient_id = patient_id
-        
         # Save to database
         db.session.add(new_transcription)
         db.session.commit()
         logger.info(f"Transcription saved with ID: {new_transcription.id}")
         
-        # Clean up temporary file if created
-        if temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.unlink(temp_file_path)
-                logger.info(f"Removed temporary file: {temp_file_path}")
-            except Exception as e:
-                logger.warning(f"Could not remove temporary file: {e}")
+        # Clean up temp file if needed
+        if temp_file and os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Removed temporary file: {file_path}")
         
-        # Return result
         return {
-            'status': 'success',
             'transcription_id': new_transcription.id,
-            'title': new_transcription.title
+            'status': 'completed',
+            'title': title
         }
         
     except Exception as e:
         logger.error(f"Error in transcription task: {str(e)}", exc_info=True)
-        # Update task state with error
-        self.update_state(state='FAILURE', meta={
+        # Return error information
+        return {
             'status': 'error',
             'error': str(e)
-        })
-        # Re-raise the exception to mark the task as failed
-        raise
+        }

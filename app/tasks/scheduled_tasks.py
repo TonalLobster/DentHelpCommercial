@@ -1,9 +1,18 @@
 """
 Scheduled tasks using Celery beat.
 """
-from app.celery_worker import celery
-from datetime import datetime
 import logging
+import os
+import tempfile
+from datetime import datetime, timedelta
+
+# Import celery instance
+try:
+    from app.celery_worker import celery
+except ImportError:
+    # Fallback for testing or direct imports
+    from celery import Celery
+    celery = Celery('dental_scribe')
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +22,6 @@ def cleanup_old_temp_files():
     Cleanup temporary files that might have been left behind.
     This task is scheduled to run periodically via Celery beat.
     """
-    import os
-    import tempfile
-    from datetime import datetime, timedelta
-
     logger.info("Running temporary file cleanup...")
     
     # Get the temp directory
@@ -77,10 +82,7 @@ def setup_periodic_tasks(sender, **kwargs):
     """
     # Run the cleanup task every day at midnight
     sender.add_periodic_task(
-        # crontab(hour=0, minute=0),  # More flexible scheduling option
         86400.0,  # Every 24 hours in seconds
         cleanup_old_temp_files.s(),
         name='cleanup_old_temp_files'
     )
-    
-    # You can add more scheduled tasks here as needed

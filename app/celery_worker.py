@@ -1,49 +1,32 @@
 """
-Celery worker configuration for DentHelp AI.
+Celery worker configuration for DentalScribe AI.
 """
 import os
 from celery import Celery
+from app import celery_config
 
-def create_celery(app=None):
-    """
-    Create a new Celery object and configure it with the Flask app.
-    """
-    if app is None:
+# Configure Celery directly from our celery_config module
+celery = Celery('dental_scribe')
+celery.config_from_object(celery_config)
+
+# Only create Flask application context when needed
+class ContextTask(celery.Task):
+    abstract = True
+    
+    def __call__(self, *args, **kwargs):
         from app import create_app
-        app = create_app()
-    
-    # Configure Celery
-    celery = Celery(
-        app.import_name,
-        broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
-        backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-    )
-    
-    # Update Celery configuration with Flask app config
-    celery.conf.update(app.config)
-    
-    # Add beat schedule if defined in app config
-    if 'CELERYBEAT_SCHEDULE' in app.config:
-        celery.conf.beat_schedule = app.config['CELERYBEAT_SCHEDULE']
-    
-    # Create TaskBase subclass to properly handle Flask app context
-    class ContextTask(celery.Task):
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
-    
-    # Use ContextTask for all tasks
-    celery.Task = ContextTask
-    
-    return celery
+        with create_app().app_context():
+            return self.run(*args, **kwargs)
 
-# Create the Celery instance
-flask_app = None  # Will be lazily loaded when needed
-celery = create_celery(flask_app)
+celery.Task = ContextTask
 
-# Import tasks to ensure they're registered with Celery
-# Use late import to avoid circular imports
-@celery.on_after_configure.connect
+# Import tasks lazily to avoid circular imports
+@celery.on_after_finalize.connect
 def setup_imports(sender, **kwargs):
-    import app.tasks.transcription_tasks
-    import app.tasks.scheduled_tasks
+    # Import tasks modules only when Celery is fully initialized
+    import importlib
+    try:
+        importlib.import_module('app.tasks.transcription_tasks')
+        importlib.import_module('app.tasks.scheduled_tasks')
+    except ImportError as e:
+        print(f"Warning: Could not import task modules: {e}")
