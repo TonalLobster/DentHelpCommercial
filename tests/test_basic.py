@@ -2,7 +2,7 @@ def test_home_page(client):
     """Test that the home page loads successfully."""
     response = client.get('/')
     assert response.status_code == 200
-    assert b'DentalScribe AI' in response.data
+    assert b'DentHelp AI' in response.data
 
 
 def test_login_page(client):
