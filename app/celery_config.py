@@ -3,18 +3,22 @@ import ssl
 
 # Kontrollera om det är en rediss:// URL och hantera SSL-inställningar
 redis_url = os.environ.get('REDIS_URL', os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'))
-redis_options = {}
+broker_transport_options = {}
+result_backend_transport_options = {}
 
 if redis_url.startswith('rediss://'):
-    redis_options = {
-        'ssl_cert_reqs': ssl.CERT_NONE
+    # Detta är formatet som celery/redis-py förväntar sig
+    broker_transport_options = {
+        'ssl_cert_reqs': ssl.CERT_NONE,
+        'ssl': {
+            'ssl_cert_reqs': ssl.CERT_NONE
+        }
     }
+    result_backend_transport_options = broker_transport_options
 
 # Celery configuration
 broker_url = redis_url
-broker_transport_options = redis_options
 result_backend = redis_url
-result_backend_transport_options = redis_options
 
 # Resten av din konfiguration
 task_serializer = 'json'
