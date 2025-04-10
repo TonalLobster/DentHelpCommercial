@@ -2,14 +2,21 @@
 Celery worker configuration for DentalScribe AI.
 """
 import os
+import ssl
 from celery import Celery
-from app import celery_config
 
-# Configure Celery directly from our celery_config module
+# Initiera Celery med konfiguration från celery_config
 celery = Celery('dental_scribe')
-celery.config_from_object(celery_config)
+celery.config_from_object('app.celery_config')
 
-# Only create Flask application context when needed
+# Extra SSL-konfiguration som appliceras direkt
+celery.conf.update(
+    broker_use_ssl={'ssl_cert_reqs': ssl.CERT_NONE},
+    redis_backend_use_ssl={'ssl_cert_reqs': ssl.CERT_NONE},
+    broker_transport_options={'ssl_cert_reqs': ssl.CERT_NONE}
+)
+
+# Endast skapa Flask-applikationskontext vid behov
 class ContextTask(celery.Task):
     abstract = True
     
