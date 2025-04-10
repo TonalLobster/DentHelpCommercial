@@ -1,12 +1,22 @@
-"""
-Separate Celery configuration to avoid circular imports.
-"""
 import os
+import ssl
+
+# Kontrollera om det är en rediss:// URL och hantera SSL-inställningar
+redis_url = os.environ.get('REDIS_URL', os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'))
+redis_options = {}
+
+if redis_url.startswith('rediss://'):
+    redis_options = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
 
 # Celery configuration
-# Celery configuration
-broker_url = os.environ.get('REDIS_URL', os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'))
-result_backend = os.environ.get('REDIS_URL', os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0'))
+broker_url = redis_url
+broker_transport_options = redis_options
+result_backend = redis_url
+result_backend_transport_options = redis_options
+
+# Resten av din konfiguration
 task_serializer = 'json'
 accept_content = ['json']
 result_serializer = 'json'
