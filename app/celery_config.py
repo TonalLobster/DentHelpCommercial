@@ -4,8 +4,9 @@ Separate Celery configuration to avoid circular imports.
 import os
 
 # Celery configuration
-broker_url = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-result_backend = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+# Celery configuration
+broker_url = os.environ.get('REDIS_URL', os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'))
+result_backend = os.environ.get('REDIS_URL', os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0'))
 task_serializer = 'json'
 accept_content = ['json']
 result_serializer = 'json'
