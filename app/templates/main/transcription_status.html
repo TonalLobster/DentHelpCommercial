@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Transkriberingsstatus | DentHelp AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-container {
+        max-width: 600px;
+        margin: 2rem auto;
+    }
+    
+    .status-card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .progress-container {
+        margin: 2rem 0;
+    }
+    
+    .progress {
+        height: 10px;
+        border-radius: 5px;
+        background-color: #e9ecef;
+    }
+    
+    .status-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .pending { color: #6c757d; }
+    .processing { color: #0d6efd; }
+    .success { color: #198754; }
+    .error { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="status-container">
+    <div class="card status-card">
+        <div class="card-body text-center p-5">
+            <h2 class="card-title mb-4">Transkriptionsstatus</h2>
+            
+            {% if response.state == 'SUCCESS' %}
+                <div class="status-icon success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Transkribering slutförd!</h3>
+                <p class="mb-4">Din transkribering har slutförts framgångsrikt.</p>
+                
+                {% if response.transcription_id %}
+                    <a href="{{ url_for('main.view_transcription', id=response.transcription_id) }}" class="btn btn-primary">
+                        <i class="fas fa-eye me-1"></i>Visa transkription
+                    </a>
+                {% endif %}
+                
+            {% elif response.state == 'FAILURE' %}
+                <div class="status-icon error">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <h3>Ett fel uppstod</h3>
+                <p class="mb-4">{{ response.error }}</p>
+                <a href="{{ url_for('main.transcribe') }}" class="btn btn-primary">
+                    <i class="fas fa-redo me-1"></i>Försök igen
+                </a>
+                
+            {% else %}
+                <div class="status-icon processing">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <h3>{{ response.status }}</h3>
+                
+                <div class="progress-container">
+                    <div class="progress">
+                        {% if response.state == 'PENDING' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 10%"></div>
+                        {% elif response.state == 'PROCESSING_AUDIO' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 25%"></div>
+                        {% elif response.state == 'TRANSCRIBING' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 50%"></div>
+                        {% elif response.state == 'GENERATING_SUMMARY' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 75%"></div>
+                        {% elif response.state == 'SAVING' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 90%"></div>
+                        {% else %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 10%"></div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <p class="text-muted">Det här kan ta några minuter beroende på längden på ljudfilen.</p>
+                
+                <script>
+                    // Automatisk uppdatering av sidan var 3:e sekund
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 3000);
+                </script>
+            {% endif %}
+            
+            <div class="mt-4">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Tillbaka till Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,7 +3,6 @@ Routes for Celery task management and monitoring.
 """
 from flask import Blueprint, jsonify, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from app.tasks.transcription_tasks import transcribe_audio_task
 from celery.result import AsyncResult
 
 celery_bp = Blueprint('celery', __name__)

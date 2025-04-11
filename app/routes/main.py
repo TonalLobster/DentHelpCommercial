@@ -44,6 +44,9 @@ def transcription_status(task_id):
     
     task = celery.AsyncResult(task_id)
     
+    # Lagra task_id i sessionen också
+    session['current_task_id'] = task_id
+    
     if task.state == 'PENDING':
         response = {
             'state': task.state,
@@ -254,6 +257,62 @@ def view_transcription(id):
     return render_template('main/view_transcription.html', 
                            transcription=transcription, 
                            summary=summary)
+
+
+@main.route('/progress-status')
+@login_required
+def progress_status():
+    """API endpoint för att hämta framstegsstatus för aktiva uppgifter."""
+    # Hämta det senaste task_id:t från session om det finns
+    task_id = session.get('current_task_id')
+    
+    if not task_id:
+        return jsonify({"message": "Ingen aktiv process hittades"}), 404
+    
+    # Hämta status om task_id finns
+    from app.utils.progress_tracker import get_task_status
+    status = get_task_status(task_id)
+    
+    if status:
+        return jsonify({
+            "task_id": task_id,
+            "status": status
+        })
+    
+    # Hämta status från Celery om den inte finns i progress_tracker
+    from app.celery_worker import celery
+    task = celery.AsyncResult(task_id)
+    
+    if task.state == 'PENDING':
+        response = {
+            "task_id": task_id,
+            "status": {
+                "progress": 0,
+                "status": "pending",
+                "message": "Uppgiften väntar på att bearbetas..."
+            }
+        }
+    elif task.state == 'FAILURE':
+        response = {
+            "task_id": task_id,
+            "status": {
+                "progress": 0,
+                "status": "error",
+                "message": f"Ett fel uppstod: {str(task.info)}"
+            }
+        }
+    else:
+        response = {
+            "task_id": task_id,
+            "status": {
+                "progress": 50,  # Uppskattning
+                "status": "processing",
+                "message": f"Status: {task.state}"
+            }
+        }
+    
+    return jsonify(response)
+
 
 @main.route('/api/transcribe', methods=['POST'])
 @login_required
