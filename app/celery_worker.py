@@ -1,43 +1,29 @@
 """
-Celery worker configuration för DentalScribe AI.
-Skapar och konfigurerar Celery-instansen som används av applikationen.
+Celery worker configuration for DentalScribe AI.
+Fixed to avoid circular imports and properly load tasks.
 """
-import os
 from celery import Celery
 
-def create_celery():
-    """Skapa och konfigurera Celery-instans"""
-    
-    # Initiera Celery med konfiguration från celery_config
-    celery = Celery('dental_scribe')
-    celery.config_from_object('app.celery_config')
-    
-    # Definiera ContextTask för att skapa Flask app-kontext vid task-körning
-    class ContextTask(celery.Task):
-        abstract = True
-        
-        def __call__(self, *args, **kwargs):
-            from app import create_app
-            with create_app().app_context():
-                return self.run(*args, **kwargs)
-    
-    celery.Task = ContextTask
-    return celery
+# Create Celery instance without Flask context initially
+celery = Celery('dental_scribe')
+celery.config_from_object('app.celery_config')
 
-# Skapa och exportera Celery-instansen
-celery = create_celery()
+# Define Flask context task base class
+class FlaskTask(celery.Task):
+    """Task that runs within Flask application context"""
+    abstract = True
+    
+    def __call__(self, *args, **kwargs):
+        # Import at runtime to avoid circular imports
+        from app import create_app
+        with create_app().app_context():
+            return self.run(*args, **kwargs)
 
-# Import tasks vid uppstart för att registrera dem
+# Apply the Flask task class to all tasks
+celery.Task = FlaskTask
+
+# Explicitly register task modules
 @celery.on_after_finalize.connect
-def setup_imports(sender, **kwargs):
-    # Importera tasks-moduler först när Celery är fullt initierad
-    import importlib
-    try:
-        importlib.import_module('app.tasks.transcription_tasks')
-        importlib.import_module('app.tasks.scheduled_tasks')
-    except ImportError as e:
-        print(f"Varning: Kunde inte importera task-moduler: {e}")
-
-# Om filen körs direkt, starta en worker
-if __name__ == '__main__':
-    celery.start()
+def setup_tasks(sender, **kwargs):
+    # Import task modules here to avoid circular imports
+    from app.tasks import transcription_tasks, scheduled_tasks
