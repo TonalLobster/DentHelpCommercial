@@ -5,6 +5,28 @@ import os
 import json
 import logging
 import tempfile
+import requests
+from datetime import datetime
+from io import BytesIO
+
+# Import celery instance
+try:
+    from app.celery_worker import celery
+except ImportError:
+    # Fallback for testing or direct imports
+    from celery import Celery
+    celery = Celery('dental_scribe')
+
+logger = logging.getLogger(__name__)
+
+"""
+Celery tasks for audio transcription and summary generation.
+"""
+import os
+import json
+import logging
+import tempfile
+import requests
 from datetime import datetime
 from io import BytesIO
 
@@ -37,57 +59,42 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
     try:
         # Import these inside the task to avoid circular imports
         from app.services.audio_processor import process_audio
-        from app.services.transcription_service import transcribe_audio
         from app.services.summary_service import generate_summary
         from app.models.transcription import Transcription
         from app import db
-        import datetime
-        import json
-        from io import BytesIO
-        import base64
         
-        # Decide how to get the audio data
-        if encoded_data:
-            logger.info(f"Starting transcription task for file: {filename} (from encoded data)")
-            # Decode the base64 data
-            file_data = base64.b64decode(encoded_data)
-            
-            # Create a BytesIO object
-            audio_data = BytesIO(file_data)
-            audio_data.name = filename
-        else:
-            logger.info(f"Starting transcription task for file: {file_path}")
-            
-            # Open the file for processing
-            try:
-                if temp_file:
-                    with open(file_path, 'rb') as f:
-                        audio_data = BytesIO(f.read())
-                        audio_data.name = os.path.basename(file_path)
-                else:
-                    audio_data = file_path
-            except FileNotFoundError:
-                error_msg = f"File not found: {file_path}"
-                logger.error(error_msg)
-                return {
-                    'status': 'error',
-                    'error': error_msg
-                }
-            
-        # Process the audio file for optimal transcription
-        logger.info("Processing audio file...")
-        self.update_state(state='PROCESSING_AUDIO', meta={'status': 'Processing audio'})
-        processed_audio, processing_error = process_audio(audio_data)
+        logger.info(f"Starting transcription task for file: {file_path}")
         
-        if processing_error:
-            logger.warning(f"Audio processing warning: {processing_error}")
-            # Continue anyway, but log the warning
+        # Get OpenAI API key
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            from app.services.transcription_service import get_api_key
+            api_key = get_api_key()
+            
+        if not api_key:
+            raise ValueError("OpenAI API key not found")
         
-        # Transcribe the audio
-        logger.info("Transcribing audio...")
+        # Update state
         self.update_state(state='TRANSCRIBING', meta={'status': 'Transcribing audio'})
-        transcription_text = transcribe_audio(processed_audio)
-        logger.info(f"Transcription completed, length: {len(transcription_text)} characters")
+        
+        # Transcribe using OpenAI API directly
+        try:
+            with open(file_path, 'rb') as f:
+                transcription_response = requests.post(
+                    'https://api.openai.com/v1/audio/transcriptions',
+                    headers={'Authorization': f'Bearer {api_key}'},
+                    files={'file': f},
+                    data={'model': 'whisper-1', 'language': 'sv'}
+                )
+                
+            if transcription_response.status_code != 200:
+                raise RuntimeError(f"OpenAI API error: {transcription_response.text}")
+                
+            transcription_text = transcription_response.json()['text']
+            logger.info(f"Transcription completed, length: {len(transcription_text)} characters")
+        except Exception as e:
+            logger.error(f"Error during transcription: {str(e)}")
+            raise
         
         # Generate summary
         logger.info("Generating summary...")
@@ -97,7 +104,7 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
         
         # Create title if not provided
         if not title or title.strip() == '':
-            title = 'Transcription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+            title = 'Transcription ' + datetime.now().strftime('%Y-%m-%d %H:%M')
             
         # Create new transcription record
         logger.info(f"Creating transcription record with title: {title}")
@@ -116,7 +123,7 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
         logger.info(f"Transcription saved with ID: {new_transcription.id}")
         
         # Clean up temp file if needed
-        if temp_file and file_path and os.path.exists(file_path):
+        if temp_file and os.path.exists(file_path):
             os.remove(file_path)
             logger.info(f"Removed temporary file: {file_path}")
         
