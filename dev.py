@@ -15,6 +15,9 @@ Commands:
     clean        - Remove __pycache__ files and directories
     reset_db     - Reset the database (drops all tables and recreates them)
     shell        - Run a Python shell in the Flask app context
+    worker       - Run a Celery worker for background tasks
+    beat         - Run Celery beat for scheduled tasks
+    flower       - Run Flower (Celery monitoring tool)
 """
 
 import os
@@ -85,6 +88,18 @@ def main():
     
     elif command == "shell":
         run_flask_command("shell")
+    
+    elif command == "worker":
+        # Run a Celery worker for processing background tasks
+        subprocess.call("celery -A app.celery_worker.celery worker --loglevel=info", shell=True)
+    
+    elif command == "beat":
+        # Run Celery beat for scheduled tasks
+        subprocess.call("celery -A app.celery_worker.celery beat --loglevel=info", shell=True)
+    
+    elif command == "flower":
+        # Run Flower for Celery monitoring
+        subprocess.call("celery -A app.celery_worker.celery flower --port=5555", shell=True)
     
     else:
         print(f"Unknown command: {command}")

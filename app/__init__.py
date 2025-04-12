@@ -6,7 +6,6 @@ from flask_login import LoginManager
 from flask_cors import CORS
 from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFProtect
-from flask_session import Session
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -18,15 +17,6 @@ migrate = Migrate()
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 csrf = CSRFProtect()
-server_session = Session()
-
-# Add this import
-from app.models.user import User
-
-# Add user loader function
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 def create_app():
     # Create and configure the app
@@ -46,19 +36,21 @@ def create_app():
         elif 'sslmode' not in database_url:
             database_url += '&sslmode=require'
     
-    # Konfigurera sessionshantering (för framstegsspårning)
-    app.config['SESSION_TYPE'] = 'filesystem'
-    app.config['SESSION_PERMANENT'] = False
-    app.config['SESSION_USE_SIGNER'] = True
-    app.config['SESSION_FILE_DIR'] = os.path.join(app.instance_path, 'sessions')
-    
     # Configure app
     app.config.from_mapping(
         SECRET_KEY=os.environ.get('SECRET_KEY', 'default-dev-key'),
         SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY'),
-        VALID_LICENSES=os.environ.get('VALID_LICENSES', '').split(',')
+        VALID_LICENSES=os.environ.get('VALID_LICENSES', '').split(','),
+        
+        # Celery configuration
+        CELERY_BROKER_URL=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+        CELERY_RESULT_BACKEND=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0'),
+        CELERY_TASK_SERIALIZER='json',
+        CELERY_ACCEPT_CONTENT=['json'],
+        CELERY_RESULT_SERIALIZER='json',
+        CELERY_ENABLE_UTC=True,
     )
     app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
     
@@ -67,27 +59,21 @@ def create_app():
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
-    server_session.init_app(app)
     CORS(app)
     
     # Only enable HTTPS in production
     if os.environ.get('FLASK_ENV') == 'production':
         Talisman(app, content_security_policy=None)
     
-    # Register blueprints
+    # Import and register blueprints
     from app.routes.auth import auth
     app.register_blueprint(auth)
     
     from app.routes.main import main
     app.register_blueprint(main)
     
-    # Registrera SSE blueprint
-    from app.routes.sse import sse
-    app.register_blueprint(sse, url_prefix='/sse')
-    
     # Ensure the instance folder exists
     os.makedirs(app.instance_path, exist_ok=True)
-    os.makedirs(os.path.join(app.instance_path, 'sessions'), exist_ok=True)
     
     # Register custom Jinja2 filters
     from app.utils.jinja_filters import register_filters
@@ -101,8 +87,11 @@ def create_app():
     from app.utils.error_handlers import register_error_handlers
     register_error_handlers(app)
     
-    # Starta bakgrundstråd för att rensa gamla framstegsspårningar
-    from app.utils.progress_tracker import start_cleanup_thread
-    start_cleanup_thread()
-    
     return app
+
+# Add user loader function
+from app.models.user import User
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
