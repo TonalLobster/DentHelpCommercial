@@ -129,21 +129,28 @@ def transcribe():
         
         if file and allowed_file(file.filename):
             try:
-                # Save file to temporary location
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.' + file.filename.split('.')[-1])
-                file.save(temp_file.name)
-                temp_file.close()
+                # Läs filen direkt till minnet
+                file_data = file.read()
+                file_size = len(file_data)
+                current_app.logger.info(f"Läser fil: {file.filename}, storlek: {file_size} bytes")
                 
-                current_app.logger.info(f"Sparade fil tillfälligt till: {temp_file.name}")
+                # Konvertera till base64 för överföring
+                import base64
+                encoded_data = base64.b64encode(file_data).decode('utf-8')
                 
-                # Get the title from the form
+                # Hämta titel från formuläret
                 title = request.form.get('title')
                 if not title or title.strip() == '':
                     title = 'Transkription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                 
-                # Start Celery task
+                # Starta Celery-task med base64-data istället för filsökväg
                 from app.tasks.transcription_tasks import process_transcription
-                task = process_transcription.delay(temp_file.name, title, current_user.id)
+                task = process_transcription.delay(
+                    encoded_data=encoded_data,
+                    filename=file.filename,
+                    title=title,
+                    user_id=current_user.id
+                )
                 
                 current_app.logger.info(f"Startade Celery-task med ID: {task.id}")
                 

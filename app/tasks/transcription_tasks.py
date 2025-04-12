@@ -19,15 +19,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 @celery.task(bind=True, name='app.tasks.process_transcription')
-def process_transcription(self, file_path, title, user_id, temp_file=True):
+def process_transcription(self, file_path=None, title=None, user_id=None, temp_file=True, encoded_data=None, filename=None):
     """
     Process an audio file: process, transcribe, and generate summary.
     
     Args:
-        file_path (str): Path to the audio file or temp file ID
+        file_path (str, optional): Path to the audio file or temp file ID
         title (str): Title for the transcription
         user_id (int): User ID of the owner
         temp_file (bool): Whether file_path is a temporary file that should be deleted
+        encoded_data (str, optional): Base64-encoded audio data
+        filename (str, optional): Original filename for base64 data
         
     Returns:
         dict: Result containing transcription ID and status
@@ -39,16 +41,38 @@ def process_transcription(self, file_path, title, user_id, temp_file=True):
         from app.services.summary_service import generate_summary
         from app.models.transcription import Transcription
         from app import db
+        import datetime
+        import json
+        from io import BytesIO
+        import base64
         
-        logger.info(f"Starting transcription task for file: {file_path}")
-        
-        # Open the file for processing
-        if temp_file:
-            with open(file_path, 'rb') as f:
-                audio_data = BytesIO(f.read())
-                audio_data.name = os.path.basename(file_path)
+        # Decide how to get the audio data
+        if encoded_data:
+            logger.info(f"Starting transcription task for file: {filename} (from encoded data)")
+            # Decode the base64 data
+            file_data = base64.b64decode(encoded_data)
+            
+            # Create a BytesIO object
+            audio_data = BytesIO(file_data)
+            audio_data.name = filename
         else:
-            audio_data = file_path
+            logger.info(f"Starting transcription task for file: {file_path}")
+            
+            # Open the file for processing
+            try:
+                if temp_file:
+                    with open(file_path, 'rb') as f:
+                        audio_data = BytesIO(f.read())
+                        audio_data.name = os.path.basename(file_path)
+                else:
+                    audio_data = file_path
+            except FileNotFoundError:
+                error_msg = f"File not found: {file_path}"
+                logger.error(error_msg)
+                return {
+                    'status': 'error',
+                    'error': error_msg
+                }
             
         # Process the audio file for optimal transcription
         logger.info("Processing audio file...")
@@ -73,7 +97,7 @@ def process_transcription(self, file_path, title, user_id, temp_file=True):
         
         # Create title if not provided
         if not title or title.strip() == '':
-            title = 'Transcription ' + datetime.now().strftime('%Y-%m-%d %H:%M')
+            title = 'Transcription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
             
         # Create new transcription record
         logger.info(f"Creating transcription record with title: {title}")
@@ -92,7 +116,7 @@ def process_transcription(self, file_path, title, user_id, temp_file=True):
         logger.info(f"Transcription saved with ID: {new_transcription.id}")
         
         # Clean up temp file if needed
-        if temp_file and os.path.exists(file_path):
+        if temp_file and file_path and os.path.exists(file_path):
             os.remove(file_path)
             logger.info(f"Removed temporary file: {file_path}")
         
