@@ -183,7 +183,6 @@ def transcribe_audio_file(audio_file):
 ```
 web: gunicorn wsgi:app
 ```
-
 ### requirements.txt för Heroku
 
 ```
