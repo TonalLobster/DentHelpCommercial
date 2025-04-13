@@ -64,6 +64,10 @@ def create_app():
     # Only enable HTTPS in production
     if os.environ.get('FLASK_ENV') == 'production':
         Talisman(app, content_security_policy=None)
+
+    # Registrera SSE blueprint
+    from app.routes.sse import sse as sse_blueprint
+    app.register_blueprint(sse_blueprint, url_prefix='/sse')
     
     # Import and register blueprints
     from app.routes.auth import auth

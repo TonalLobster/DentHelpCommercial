@@ -98,9 +98,17 @@ def transcription_status(task_id):
     
     return render_template('main/transcription_status.html', response=response, task_id=task_id)
 
-@main.route('/transcribe', methods=['GET', 'POST'])
+@main.route('/transcribe', methods=['POST'])
 @login_required
 def transcribe():
+    if file and allowed_file(file.filename):
+        # Spara tillfällig fil på Heroku filesystem
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.' + file.filename.split('.')[-1])
+        file.save(temp_file.name)
+        temp_file.close()
+        
+        # Starta task med filsökvägen
+        task = process_transcription.delay(temp_file.name, title, current_user.id)
     """Page for creating new transcriptions."""
     # Create a simple form for CSRF protection
     form = FlaskForm()

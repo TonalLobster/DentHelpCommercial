@@ -555,7 +555,12 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/progress-status')
         .then(response => response.json())
         .then(data => {
+            // Nollställ progress-trackers först
+            uploadProgressTracker.reset();
+            recordProgressTracker.reset();
+            
             if (data && data.task_id && data.status && data.status.status !== 'completed' && data.status.status !== 'error') {
+                // Det finns en aktiv uppgift, återuppta tracking
                 const activeTab = document.querySelector('.nav-link.active');
                 if (activeTab) {
                     const targetId = activeTab.getAttribute('data-bs-target');
@@ -565,9 +570,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         uploadProgressTracker.start(data.task_id);
                     }
                 }
+            } else {
+                // Ingen aktiv uppgift, dölj progress-trackers
+                uploadProgressTracker.hide();
+                recordProgressTracker.hide();
             }
         })
         .catch(err => {
             console.error('Kunde inte kontrollera framstegsstatus:', err);
+            // Vid fel, dölj progress-trackers för säkerhets skull
+            uploadProgressTracker.hide();
+            recordProgressTracker.hide();
         });
 });

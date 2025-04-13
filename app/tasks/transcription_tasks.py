@@ -6,27 +6,8 @@ import json
 import logging
 import tempfile
 import requests
-from datetime import datetime
-from io import BytesIO
-
-# Import celery instance
-try:
-    from app.celery_worker import celery
-except ImportError:
-    # Fallback for testing or direct imports
-    from celery import Celery
-    celery = Celery('dental_scribe')
-
-logger = logging.getLogger(__name__)
-
-"""
-Celery tasks for audio transcription and summary generation.
-"""
-import os
-import json
-import logging
-import tempfile
-import requests
+import base64
+import gc  # För minneshantering
 from datetime import datetime
 from io import BytesIO
 
@@ -41,7 +22,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 @celery.task(bind=True, name='app.tasks.process_transcription')
-def process_transcription(self, file_path=None, title=None, user_id=None, temp_file=True, encoded_data=None, filename=None):
+def process_transcription(self, file_path=None, title=None, user_id=None, temp_file=True, 
+                         encoded_data=None, filename=None):
     """
     Process an audio file: process, transcribe, and generate summary.
     
@@ -56,6 +38,8 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
     Returns:
         dict: Result containing transcription ID and status
     """
+    temp_file_path = None
+    
     try:
         # Import these inside the task to avoid circular imports
         from app.services.audio_processor import process_audio
@@ -63,7 +47,26 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
         from app.models.transcription import Transcription
         from app import db
         
-        logger.info(f"Starting transcription task for file: {file_path}")
+        # Hantera antingen filsökväg eller base64-data
+        if encoded_data:
+            logger.info(f"Starting transcription from base64 data, filename: {filename}")
+            # Dekoda base64 till temporär fil
+            temp_file_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{filename.split('.')[-1]}" if filename else ".mp3").name
+            with open(temp_file_path, 'wb') as f:
+                f.write(base64.b64decode(encoded_data))
+            
+            # Frigör minne genom att rensa encoded_data
+            encoded_data = None
+            gc.collect()
+            
+            # Använd denna temporära fil
+            file_path = temp_file_path
+        elif file_path:
+            logger.info(f"Starting transcription task for file: {file_path}")
+        else:
+            error_msg = "Neither file_path nor encoded_data provided"
+            logger.error(error_msg)
+            return {'status': 'error', 'error': error_msg}
         
         # Get OpenAI API key
         api_key = os.environ.get('OPENAI_API_KEY')
@@ -80,6 +83,7 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
         # Transcribe using OpenAI API directly
         try:
             with open(file_path, 'rb') as f:
+                # Optimera minnesanvändning genom att använda chunked uploads om möjligt
                 transcription_response = requests.post(
                     'https://api.openai.com/v1/audio/transcriptions',
                     headers={'Authorization': f'Bearer {api_key}'},
@@ -92,6 +96,11 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
                 
             transcription_text = transcription_response.json()['text']
             logger.info(f"Transcription completed, length: {len(transcription_text)} characters")
+            
+            # Frigör minne
+            transcription_response = None
+            gc.collect()
+            
         except Exception as e:
             logger.error(f"Error during transcription: {str(e)}")
             raise
@@ -122,11 +131,6 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
         db.session.commit()
         logger.info(f"Transcription saved with ID: {new_transcription.id}")
         
-        # Clean up temp file if needed
-        if temp_file and os.path.exists(file_path):
-            os.remove(file_path)
-            logger.info(f"Removed temporary file: {file_path}")
-        
         return {
             'transcription_id': new_transcription.id,
             'status': 'completed',
@@ -140,3 +144,20 @@ def process_transcription(self, file_path=None, title=None, user_id=None, temp_f
             'status': 'error',
             'error': str(e)
         }
+    finally:
+        # Alltid rensa upp temporära filer och frig??r minne, även om ett fel inträffade
+        try:
+            # Ta bort temporär fil om vi skapade den från base64-data
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+                logger.info(f"Removed temporary file: {temp_file_path}")
+                
+            # Om det är en vanlig filsökväg och den ska tas bort
+            if temp_file and file_path and file_path != temp_file_path and os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Removed temporary file: {file_path}")
+                
+            # Explicit frigör minne
+            gc.collect()
+        except Exception as cleanup_error:
+            logger.error(f"Error during cleanup: {cleanup_error}")
