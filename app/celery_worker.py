@@ -27,3 +27,12 @@ celery.Task = FlaskTask
 def setup_tasks(sender, **kwargs):
     # Import task modules here to avoid circular imports
     from app.tasks import transcription_tasks, scheduled_tasks
+
+
+celery.conf.update(
+    worker_max_tasks_per_child=50,  # Starta om worker efter 50 uppgifter
+    broker_connection_timeout=10,    # Timeout för broker-anslutningar
+    task_time_limit=600,             # 10 minuter maximal exekveringstid
+    task_soft_time_limit=540,        # 9 minuter varning innan avslut
+    result_expires=3600              # Spara resultat i 1 timme sen rensa
+)

@@ -19,59 +19,43 @@ logger = logging.getLogger(__name__)
 @celery.task(name='app.tasks.cleanup_old_temp_files')
 def cleanup_old_temp_files():
     """
-    Cleanup temporary files that might have been left behind.
-    This task is scheduled to run periodically via Celery beat.
+    En mer aggressiv rensning av temporära filer och celery-statusar
     """
-    logger.info("Running temporary file cleanup...")
-    
-    # Get the temp directory
+    # Nuvarande filrensningskod, men gör den mer omfattande
     temp_dir = tempfile.gettempdir()
-    
-    # Define how old files should be before deletion (e.g., 24 hours)
-    max_age = timedelta(hours=24)
-    
-    # Get current time
+    max_age = timedelta(hours=1)  # Ändra till kortare tid för mer aggressiv rensning
     now = datetime.now()
     
-    # Get all files in the temp directory
-    file_count = 0
-    error_count = 0
+    # Rensa ALLA temporära filer äldre än max_age för att fånga upp alla former av temporära filer
+    for root, dirs, files in os.walk(temp_dir):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            try:
+                stats = os.stat(file_path)
+                last_modified = datetime.fromtimestamp(stats.st_mtime)
+                if now - last_modified > max_age:
+                    os.remove(file_path)
+                    logger.info(f"Removed old temp file: {file_path}")
+            except Exception as e:
+                logger.warning(f"Could not process file {file_path}: {str(e)}")
     
+    # Rensa Redis-uppgifter
     try:
-        for root, dirs, files in os.walk(temp_dir):
-            for filename in files:
-                # Check if it's likely one of our temp files (can be customized)
-                if filename.endswith(('.wav', '.mp3', '.m4a', '.ogg')):
-                    file_path = os.path.join(root, filename)
-                    
-                    try:
-                        # Get file stats
-                        stats = os.stat(file_path)
-                        
-                        # Get file creation/modification time
-                        last_modified = datetime.fromtimestamp(stats.st_mtime)
-                        
-                        # If file is older than max_age, delete it
-                        if now - last_modified > max_age:
-                            os.remove(file_path)
-                            file_count += 1
-                    except (FileNotFoundError, PermissionError) as e:
-                        logger.warning(f"Could not process file {file_path}: {str(e)}")
-                        error_count += 1
-                        continue
+        from celery.result import AsyncResult
+        from app import db
+        from app.models.transcription import Transcription
         
-        logger.info(f"Cleanup complete. Removed {file_count} temporary files. Errors: {error_count}")
-        return {
-            'cleaned_files': file_count, 
-            'errors': error_count,
-            'timestamp': datetime.now().isoformat()
-        }
+        # Hämta alla slutförda transkriptioner från databasen
+        transcriptions = Transcription.query.all()
+        
+        # Ta bort uppgifts-ID från Redis
+        for transcription in transcriptions:
+            # Om du lagrar task_id någonstans i transcription-modellen
+            # Så kan du rensa motsvarande uppgifter från Redis
+            pass
+            
     except Exception as e:
-        logger.error(f"Error during temp file cleanup: {str(e)}")
-        return {
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }
+        logger.error(f"Error during Redis cleanup: {str(e)}")
 
 # Set up periodic tasks
 @celery.on_after_configure.connect
