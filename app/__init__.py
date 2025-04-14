@@ -71,10 +71,10 @@ def create_app():
     
     # Import and register blueprints
     from app.routes.auth import auth
-    app.register_blueprint(auth)
+    app.register_blueprint(auth, url_prefix='/auth')
     
     from app.routes.main import main
-    app.register_blueprint(main)
+    app.register_blueprint(main, url_prefix='')
     
     # Ensure the instance folder exists
     os.makedirs(app.instance_path, exist_ok=True)

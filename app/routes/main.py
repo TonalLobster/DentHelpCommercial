@@ -16,7 +16,7 @@ from app.models.transcription import Transcription
 from app.utils.progress_tracker import register_task, update_task_status, get_task_status
 from app import db
 
-main = Blueprint('main', __name__)
+main = Blueprint('main', __name__, url_prefix='')
 
 def allowed_file(filename):
     """Check if the file has an allowed extension."""
@@ -98,17 +98,9 @@ def transcription_status(task_id):
     
     return render_template('main/transcription_status.html', response=response, task_id=task_id)
 
-@main.route('/transcribe', methods=['POST'])
+@main.route('/transcribe', methods=['GET', 'POST'])
 @login_required
 def transcribe():
-    if file and allowed_file(file.filename):
-        # Spara tillfällig fil på Heroku filesystem
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.' + file.filename.split('.')[-1])
-        file.save(temp_file.name)
-        temp_file.close()
-        
-        # Starta task med filsökvägen
-        task = process_transcription.delay(temp_file.name, title, current_user.id)
     """Page for creating new transcriptions."""
     # Create a simple form for CSRF protection
     form = FlaskForm()
@@ -137,28 +129,21 @@ def transcribe():
         
         if file and allowed_file(file.filename):
             try:
-                # Läs filen direkt till minnet
-                file_data = file.read()
-                file_size = len(file_data)
-                current_app.logger.info(f"Läser fil: {file.filename}, storlek: {file_size} bytes")
+                # Spara original-ljudet tillfälligt
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.' + file.filename.split('.')[-1])
+                file.save(temp_file.name)
+                temp_file.close()
                 
-                # Konvertera till base64 för överföring
-                import base64
-                encoded_data = base64.b64encode(file_data).decode('utf-8')
+                current_app.logger.info(f"Sparade fil tillfälligt till: {temp_file.name}")
                 
                 # Hämta titel från formuläret
                 title = request.form.get('title')
                 if not title or title.strip() == '':
                     title = 'Transkription ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                 
-                # Starta Celery-task med base64-data istället för filsökväg
+                # Starta Celery task
                 from app.tasks.transcription_tasks import process_transcription
-                task = process_transcription.delay(
-                    encoded_data=encoded_data,
-                    filename=file.filename,
-                    title=title,
-                    user_id=current_user.id
-                )
+                task = process_transcription.delay(temp_file.name, title, current_user.id)
                 
                 current_app.logger.info(f"Startade Celery-task med ID: {task.id}")
                 
